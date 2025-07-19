@@ -20,7 +20,6 @@ export default function RouteDetailsPage({ params }: { params: Promise<{ id: str
   useEffect(() => {
     if (id) {
       fetchRouteDetails();
-      fetchAllSections();
     }
   }, [id]);
 
