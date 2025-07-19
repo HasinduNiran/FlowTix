@@ -6,6 +6,7 @@ import { TicketService, Ticket } from '@/services/ticket.service';
 import { RouteService } from '@/services/route.service';
 import { BusService } from '@/services/bus.service';
 import { StopService } from '@/services/stop.service';
+import { TripService } from '@/services/trip.service';
 import { DataTable } from '@/components/dashboard/DataTable';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -13,6 +14,7 @@ import { Input } from '@/components/ui/Input';
 export default function TicketsPage() {
   const router = useRouter();
   const busSearchRef = useRef<HTMLDivElement>(null);
+  const routeSearchRef = useRef<HTMLDivElement>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,9 +25,15 @@ export default function TicketsPage() {
   const [selectedBus, setSelectedBus] = useState<string>('');
   const [busSearchTerm, setBusSearchTerm] = useState<string>('');
   const [showBusSuggestions, setShowBusSuggestions] = useState<boolean>(false);
+  const [selectedRoute, setSelectedRoute] = useState<string>('');
+  const [routeSearchTerm, setRouteSearchTerm] = useState<string>('');
+  const [showRouteSuggestions, setShowRouteSuggestions] = useState<boolean>(false);
   const [routes, setRoutes] = useState<any[]>([]);
   const [buses, setBuses] = useState<any[]>([]);
   const [routeStops, setRouteStops] = useState<any[]>([]);
+  const [dateFilter, setDateFilter] = useState<string>(new Date().toISOString().split('T')[0]); // Default to today
+  const [tripNumberFilter, setTripNumberFilter] = useState<string>('latest');
+  const [availableTrips, setAvailableTrips] = useState<number[]>([]);
 
   // Fetch initial data on component mount
   useEffect(() => {
@@ -33,22 +41,27 @@ export default function TicketsPage() {
     fetchBuses();
   }, []);
 
-  // Fetch tickets when bus is selected
+  // Fetch tickets when bus, date, or trip number is selected
   useEffect(() => {
     if (selectedBus) {
-      fetchTicketsByBus(selectedBus);
+      fetchTicketsByBusAndFilters(selectedBus);
       fetchRouteStops(selectedBus);
+      fetchAvailableTrips(selectedBus);
     } else {
       setTickets([]);
       setRouteStops([]);
+      setAvailableTrips([]);
     }
-  }, [selectedBus]);
+  }, [selectedBus, dateFilter, tripNumberFilter]);
 
   // Handle click outside to close suggestions
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (busSearchRef.current && !busSearchRef.current.contains(event.target as Node)) {
         setShowBusSuggestions(false);
+      }
+      if (routeSearchRef.current && !routeSearchRef.current.contains(event.target as Node)) {
+        setShowRouteSuggestions(false);
       }
     };
 
@@ -91,6 +104,7 @@ export default function TicketsPage() {
   const fetchRoutes = async () => {
     try {
       const routeData = await RouteService.getAllRoutes();
+      console.log('Routes fetched:', routeData); // Debug log
       setRoutes(routeData);
     } catch (err) {
       console.error('Error fetching routes:', err);
@@ -100,6 +114,7 @@ export default function TicketsPage() {
   const fetchBuses = async () => {
     try {
       const busData = await BusService.getAllBuses();
+      console.log('Buses fetched:', busData); // Debug log
       setBuses(busData);
     } catch (err) {
       console.error('Error fetching buses:', err);
@@ -132,11 +147,83 @@ export default function TicketsPage() {
     }
   };
 
+  const fetchTicketsByBusAndFilters = async (busId: string) => {
+    setLoading(true);
+    try {
+      const data = await TicketService.getAllTickets();
+      
+      // Filter tickets by selected bus, date, and trip number
+      let filteredTickets = data.filter((ticket: Ticket) => ticket.busId === busId);
+      
+      // Filter by date
+      if (dateFilter) {
+        const filterDate = new Date(dateFilter).toDateString();
+        filteredTickets = filteredTickets.filter((ticket: Ticket) => {
+          const ticketDate = new Date(ticket.dateTime).toDateString();
+          return ticketDate === filterDate;
+        });
+      }
+      
+      // Filter by trip number
+      if (tripNumberFilter !== 'all') {
+        if (tripNumberFilter === 'latest') {
+          // Get the latest (highest) trip number from filtered tickets
+          const latestTripNumber = Math.max(...filteredTickets.map(t => t.tripNumber));
+          if (latestTripNumber !== -Infinity) {
+            filteredTickets = filteredTickets.filter((ticket: Ticket) => ticket.tripNumber === latestTripNumber);
+          }
+        } else {
+          const tripNum = parseInt(tripNumberFilter);
+          filteredTickets = filteredTickets.filter((ticket: Ticket) => ticket.tripNumber === tripNum);
+        }
+      }
+      
+      setTickets(filteredTickets);
+      setError(null);
+    } catch (err) {
+      console.error('Failed to fetch tickets:', err);
+      setError('Failed to load tickets. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAvailableTrips = async (busId: string) => {
+    try {
+      const data = await TicketService.getAllTickets();
+      
+      // Filter tickets by selected bus and date
+      let busTickets = data.filter((ticket: Ticket) => ticket.busId === busId);
+      
+      if (dateFilter) {
+        const filterDate = new Date(dateFilter).toDateString();
+        busTickets = busTickets.filter((ticket: Ticket) => {
+          const ticketDate = new Date(ticket.dateTime).toDateString();
+          return ticketDate === filterDate;
+        });
+      }
+      
+      // Get unique trip numbers and sort them
+      const tripNumbers = [...new Set(busTickets.map(ticket => ticket.tripNumber))].sort((a, b) => b - a);
+      setAvailableTrips(tripNumbers);
+      
+      // Auto-select the latest trip if 'latest' is selected and trips are available
+      if (tripNumberFilter === 'latest' && tripNumbers.length > 0) {
+        // The latest trip is already selected by the filtering logic
+      }
+    } catch (err) {
+      console.error('Error fetching available trips:', err);
+      setAvailableTrips([]);
+    }
+  };
+
   const handleDeleteTicket = async (ticketId: string) => {
     if (window.confirm('Are you sure you want to delete this ticket?')) {
       try {
         await TicketService.deleteTicket(ticketId);
-        fetchTickets(); // Refresh the list
+        if (selectedBus) {
+          fetchTicketsByBusAndFilters(selectedBus); // Refresh the list
+        }
       } catch (err: any) {
         alert(err.message || 'Failed to delete ticket');
       }
@@ -149,7 +236,7 @@ export default function TicketsPage() {
 
   const getRouteName = (routeId: string) => {
     const route = routes.find(route => route._id === routeId);
-    return route?.name || 'Unknown Route';
+    return route?.name || route?.routeName || 'Unknown Route';
   };
 
   const getBusNumber = (busId: string) => {
@@ -239,13 +326,65 @@ export default function TicketsPage() {
 
   const uniqueStops = getUniqueStops();
 
+  // Handle route search and selection
+  const handleRouteSearch = (value: string) => {
+    setRouteSearchTerm(value);
+    setShowRouteSuggestions(value.length > 0);
+    
+    // If the value exactly matches a route name or number, select it
+    const exactMatch = routes.find(route => 
+      route.name?.toLowerCase() === value.toLowerCase() ||
+      route.routeName?.toLowerCase() === value.toLowerCase() ||
+      route.routeNumber?.toLowerCase() === value.toLowerCase() ||
+      route.code?.toLowerCase() === value.toLowerCase()
+    );
+    if (exactMatch && selectedRoute !== exactMatch._id) {
+      setSelectedRoute(exactMatch._id);
+    } else if (!exactMatch && selectedRoute) {
+      // Clear selection if no exact match and something was previously selected
+      setSelectedRoute('');
+    }
+  };
+
+  const handleRouteSelect = (route: any) => {
+    setSelectedRoute(route._id);
+    const routeName = route.name || route.routeName || 'Unknown Route';
+    const routeNumber = route.routeNumber || route.code || '';
+    setRouteSearchTerm(`${routeName}${routeNumber ? ` (${routeNumber})` : ''}`);
+    setShowRouteSuggestions(false);
+    // Reset bus and other filters when route changes
+    setSelectedBus('');
+    setBusSearchTerm('');
+    setFromStopFilter('all');
+    setToStopFilter('all');
+    setSearchTerm('');
+    setPaymentMethodFilter('all');
+    setTripNumberFilter('latest');
+  };
+
+  // Filter routes based on search term
+  const getFilteredRoutes = () => {
+    if (!routeSearchTerm) return [];
+    return routes.filter(route => {
+      const routeName = route.name || route.routeName || '';
+      const routeNumber = route.routeNumber || route.code || '';
+      return routeName.toLowerCase().includes(routeSearchTerm.toLowerCase()) ||
+             routeNumber.toLowerCase().includes(routeSearchTerm.toLowerCase());
+    }).slice(0, 5); // Limit to 5 suggestions
+  };
+
+  const filteredRoutes = getFilteredRoutes();
+
   // Handle bus search and selection
   const handleBusSearch = (value: string) => {
     setBusSearchTerm(value);
     setShowBusSuggestions(value.length > 0);
     
+    // Get available buses based on route selection
+    const availableBuses = getAvailableBuses();
+    
     // If the value exactly matches a bus number, select it
-    const exactMatch = buses.find(bus => bus.busNumber.toLowerCase() === value.toLowerCase());
+    const exactMatch = availableBuses.find(bus => bus.busNumber.toLowerCase() === value.toLowerCase());
     if (exactMatch && selectedBus !== exactMatch._id) {
       setSelectedBus(exactMatch._id);
     } else if (!exactMatch && selectedBus) {
@@ -263,12 +402,30 @@ export default function TicketsPage() {
     setToStopFilter('all');
     setSearchTerm('');
     setPaymentMethodFilter('all');
+    setTripNumberFilter('latest');
   };
 
-  // Filter buses based on search term
+  // Get available buses based on route selection
+  const getAvailableBuses = () => {
+    if (selectedRoute) {
+      console.log('Filtering buses for route:', selectedRoute); // Debug log
+      const filtered = buses.filter(bus => {
+        // Handle both string and object routeId
+        const busRouteId = typeof bus.routeId === 'string' ? bus.routeId : bus.routeId?._id;
+        console.log('Bus:', bus.busNumber, 'RouteId:', busRouteId, 'Selected:', selectedRoute); // Debug log
+        return busRouteId === selectedRoute;
+      });
+      console.log('Filtered buses:', filtered); // Debug log
+      return filtered;
+    }
+    return buses; // Show all buses if no route selected
+  };
+
+  // Filter buses based on search term and route selection
   const getFilteredBuses = () => {
     if (!busSearchTerm) return [];
-    return buses.filter(bus => 
+    const availableBuses = getAvailableBuses();
+    return availableBuses.filter(bus => 
       bus.busNumber.toLowerCase().includes(busSearchTerm.toLowerCase())
     ).slice(0, 5); // Limit to 5 suggestions
   };
@@ -387,7 +544,7 @@ export default function TicketsPage() {
                   <span className="text-blue-800 font-bold">{filteredTickets.length}</span>
                 </div>
                 <Button 
-                  onClick={() => selectedBus ? fetchTicketsByBus(selectedBus) : null}
+                  onClick={() => selectedBus ? fetchTicketsByBusAndFilters(selectedBus) : null}
                   variant="outline"
                   className="flex items-center space-x-2"
                   disabled={!selectedBus}
@@ -403,10 +560,93 @@ export default function TicketsPage() {
 
           {/* Filters Section */}
           <div className="bg-gray-50 border-b border-gray-200 p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-3">
+              <div className="relative" ref={routeSearchRef}>
+                <label htmlFor="routeSearch" className="block text-xs font-medium text-gray-700 mb-1">
+                  Route (Optional)
+                </label>
+                <div className="relative">
+                  <Input
+                    id="routeSearch"
+                    type="text"
+                    value={routeSearchTerm}
+                    onChange={(e) => handleRouteSearch(e.target.value)}
+                    onFocus={() => setShowRouteSuggestions(routeSearchTerm.length > 0)}
+                    placeholder="Type route name or number..."
+                    className="w-full text-sm px-2 py-1.5"
+                    autoComplete="off"
+                  />
+                  
+                  {/* Route Suggestions Dropdown */}
+                  {showRouteSuggestions && filteredRoutes.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                      {filteredRoutes.map((route) => {
+                        const routeName = route.name || route.routeName || 'Unknown Route';
+                        const routeNumber = route.routeNumber || route.code || '';
+                        return (
+                          <button
+                            key={route._id}
+                            onClick={() => handleRouteSelect(route)}
+                            className="w-full px-3 py-2 text-left hover:bg-blue-50 focus:bg-blue-50 focus:outline-none border-b border-gray-100 last:border-b-0"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-blue-900">
+                                {routeName}
+                              </span>
+                              {routeNumber && (
+                                <span className="text-sm text-gray-500">({routeNumber})</span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  
+                  {/* No results message */}
+                  {showRouteSuggestions && routeSearchTerm && filteredRoutes.length === 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg p-3">
+                      <div className="text-gray-500 text-sm">No routes found matching "{routeSearchTerm}"</div>
+                    </div>
+                  )}
+                  
+                  {/* Selected route indicator */}
+                  {selectedRoute && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  )}
+                  
+                  {/* Clear route button */}
+                  {selectedRoute && (
+                    <button
+                      onClick={() => {
+                        setSelectedRoute('');
+                        setRouteSearchTerm('');
+                        setSelectedBus('');
+                        setBusSearchTerm('');
+                        setFromStopFilter('all');
+                        setToStopFilter('all');
+                        setSearchTerm('');
+                        setPaymentMethodFilter('all');
+                        setTripNumberFilter('latest');
+                        setDateFilter(new Date().toISOString().split('T')[0]);
+                      }}
+                      className="absolute right-10 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div className="relative" ref={busSearchRef}>
-                <label htmlFor="busSearch" className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Bus *
+                <label htmlFor="busSearch" className="block text-xs font-medium text-gray-700 mb-1">
+                  Bus *
                 </label>
                 <div className="relative">
                   <Input
@@ -416,7 +656,7 @@ export default function TicketsPage() {
                     onChange={(e) => handleBusSearch(e.target.value)}
                     onFocus={() => setShowBusSuggestions(busSearchTerm.length > 0)}
                     placeholder="Type bus number..."
-                    className="w-full"
+                    className="w-full text-sm px-2 py-1.5"
                     autoComplete="off"
                   />
                   
@@ -443,7 +683,12 @@ export default function TicketsPage() {
                   {/* No results message */}
                   {showBusSuggestions && busSearchTerm && filteredBuses.length === 0 && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg p-3">
-                      <div className="text-gray-500 text-sm">No buses found matching "{busSearchTerm}"</div>
+                      <div className="text-gray-500 text-sm">
+                        {selectedRoute 
+                          ? `No buses found for selected route matching "${busSearchTerm}"` 
+                          : `No buses found matching "${busSearchTerm}"`
+                        }
+                      </div>
                     </div>
                   )}
                   
@@ -456,11 +701,50 @@ export default function TicketsPage() {
                     </div>
                   )}
                 </div>
+                {selectedRoute && (
+                  <div className="text-xs text-blue-600 mt-1">
+                    Showing buses for: {getRouteName(selectedRoute)}
+                  </div>
+                )}
               </div>
 
               <div>
-                <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
-                  Search Tickets
+                <label htmlFor="dateFilter" className="block text-xs font-medium text-gray-700 mb-1">
+                  Date *
+                </label>
+                <Input
+                  id="dateFilter"
+                  type="date"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="w-full text-sm px-2 py-1.5"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="tripNumber" className="block text-xs font-medium text-gray-700 mb-1">
+                  Trip
+                </label>
+                <select
+                  id="tripNumber"
+                  value={tripNumberFilter}
+                  onChange={(e) => setTripNumberFilter(e.target.value)}
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  disabled={!selectedBus}
+                >
+                  <option value="latest">Latest Trip</option>
+                  <option value="all">All Trips</option>
+                  {availableTrips.map((tripNum) => (
+                    <option key={tripNum} value={tripNum.toString()}>
+                      Trip {tripNum}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="search" className="block text-xs font-medium text-gray-700 mb-1">
+                  Search
                 </label>
                 <Input
                   id="search"
@@ -468,20 +752,20 @@ export default function TicketsPage() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search by ticket ID, route, bus..."
-                  className="w-full"
+                  className="w-full text-sm px-2 py-1.5"
                   disabled={!selectedBus}
                 />
               </div>
               
               <div>
-                <label htmlFor="fromStop" className="block text-sm font-medium text-gray-700 mb-2">
-                  From Stop
+                <label htmlFor="fromStop" className="block text-xs font-medium text-gray-700 mb-1">
+                  From
                 </label>
                 <select
                   id="fromStop"
                   value={fromStopFilter}
                   onChange={(e) => setFromStopFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   disabled={!selectedBus}
                 >
                   <option value="all">All From Stops</option>
@@ -494,14 +778,14 @@ export default function TicketsPage() {
               </div>
 
               <div>
-                <label htmlFor="toStop" className="block text-sm font-medium text-gray-700 mb-2">
-                  To Stop
+                <label htmlFor="toStop" className="block text-xs font-medium text-gray-700 mb-1">
+                  To
                 </label>
                 <select
                   id="toStop"
                   value={toStopFilter}
                   onChange={(e) => setToStopFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   disabled={!selectedBus}
                 >
                   <option value="all">All To Stops</option>
@@ -514,14 +798,14 @@ export default function TicketsPage() {
               </div>
 
               <div>
-                <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-700 mb-2">
-                  Payment Method
+                <label htmlFor="paymentMethod" className="block text-xs font-medium text-gray-700 mb-1">
+                  Payment
                 </label>
                 <select
                   id="paymentMethod"
                   value={paymentMethodFilter}
                   onChange={(e) => setPaymentMethodFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   disabled={!selectedBus}
                 >
                   <option value="all">All Methods</option>
@@ -538,12 +822,17 @@ export default function TicketsPage() {
                     setPaymentMethodFilter('all');
                     setFromStopFilter('all');
                     setToStopFilter('all');
+                    setTripNumberFilter('latest');
+                    // Don't reset date as it should stay as today by default
                   }}
                   variant="outline"
-                  className="w-full"
+                  className="w-full flex items-center justify-center space-x-1 text-sm px-2 py-1.5 h-[34px]"
                   disabled={!selectedBus}
                 >
-                  Clear Filters
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  <span>Clear</span>
                 </Button>
               </div>
             </div>
@@ -589,10 +878,20 @@ export default function TicketsPage() {
           </div>
 
           {/* Filter Summary */}
-          {(fromStopFilter !== 'all' || toStopFilter !== 'all' || paymentMethodFilter !== 'all' || searchTerm) && (
+          {(selectedRoute || fromStopFilter !== 'all' || toStopFilter !== 'all' || paymentMethodFilter !== 'all' || searchTerm) && (
             <div className="bg-blue-50 border-t border-blue-200 p-4">
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="text-blue-700 font-medium">Active Filters:</span>
+                {selectedRoute && (
+                  <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                    Route: {getRouteName(selectedRoute)}
+                  </span>
+                )}
+                {selectedBus && (
+                  <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                    Bus: {getBusNumber(selectedBus)}
+                  </span>
+                )}
                 {fromStopFilter !== 'all' && (
                   <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
                     From: {uniqueStops.find(s => s._id === fromStopFilter)?.stopName}
