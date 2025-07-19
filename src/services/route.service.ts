@@ -12,6 +12,12 @@ export interface Route {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  
+  // Backend uses these field names
+  routeName?: string;
+  routeNumber?: string;
+  startPoint?: string;
+  endPoint?: string;
 }
 
 export interface Section {
@@ -40,7 +46,20 @@ export const RouteService = {
   async getAllRoutes(): Promise<Route[]> {
     try {
       const response = await api.get('/routes');
-      return response.data.data;
+      // Map backend field names to frontend field names
+      return response.data.data.map((route: any) => ({
+        _id: route._id,
+        name: route.routeName,
+        code: route.routeNumber,
+        startLocation: route.startPoint,
+        endLocation: route.endPoint,
+        distance: route.distance,
+        estimatedDuration: route.estimatedDuration,
+        isActive: route.isActive,
+        description: route.description,
+        createdAt: route.createdAt,
+        updatedAt: route.updatedAt
+      }));
     } catch (error) {
       console.error('Error fetching routes:', error);
       throw error;
@@ -50,7 +69,21 @@ export const RouteService = {
   async getRouteById(id: string): Promise<Route> {
     try {
       const response = await api.get(`/routes/${id}`);
-      return response.data.data;
+      const route = response.data.data;
+      // Map backend field names to frontend field names
+      return {
+        _id: route._id,
+        name: route.routeName,
+        code: route.routeNumber,
+        startLocation: route.startPoint,
+        endLocation: route.endPoint,
+        distance: route.distance,
+        estimatedDuration: route.estimatedDuration,
+        isActive: route.isActive,
+        description: route.description,
+        createdAt: route.createdAt,
+        updatedAt: route.updatedAt
+      };
     } catch (error) {
       console.error(`Error fetching route with id ${id}:`, error);
       throw error;
@@ -59,8 +92,35 @@ export const RouteService = {
   
   async createRoute(routeData: Omit<Route, '_id' | 'createdAt' | 'updatedAt'>): Promise<Route> {
     try {
-      const response = await api.post('/routes', routeData);
-      return response.data.data;
+      // Map frontend field names to backend field names
+      const backendRouteData = {
+        routeName: routeData.name,
+        routeNumber: routeData.code,
+        startPoint: routeData.startLocation,
+        endPoint: routeData.endLocation,
+        distance: routeData.distance,
+        estimatedDuration: routeData.estimatedDuration,
+        isActive: routeData.isActive,
+        description: routeData.description
+      };
+      
+      const response = await api.post('/routes', backendRouteData);
+      const route = response.data.data;
+      
+      // Return with frontend field names
+      return {
+        _id: route._id,
+        name: route.routeName,
+        code: route.routeNumber,
+        startLocation: route.startPoint,
+        endLocation: route.endPoint,
+        distance: route.distance,
+        estimatedDuration: route.estimatedDuration,
+        isActive: route.isActive,
+        description: route.description,
+        createdAt: route.createdAt,
+        updatedAt: route.updatedAt
+      };
     } catch (error) {
       console.error('Error creating route:', error);
       throw error;
@@ -69,8 +129,35 @@ export const RouteService = {
   
   async updateRoute(id: string, routeData: Partial<Omit<Route, '_id' | 'createdAt' | 'updatedAt'>>): Promise<Route> {
     try {
-      const response = await api.put(`/routes/${id}`, routeData);
-      return response.data.data;
+      // Map frontend field names to backend field names
+      const backendRouteData: any = {};
+      
+      if (routeData.name !== undefined) backendRouteData.routeName = routeData.name;
+      if (routeData.code !== undefined) backendRouteData.routeNumber = routeData.code;
+      if (routeData.startLocation !== undefined) backendRouteData.startPoint = routeData.startLocation;
+      if (routeData.endLocation !== undefined) backendRouteData.endPoint = routeData.endLocation;
+      if (routeData.distance !== undefined) backendRouteData.distance = routeData.distance;
+      if (routeData.estimatedDuration !== undefined) backendRouteData.estimatedDuration = routeData.estimatedDuration;
+      if (routeData.isActive !== undefined) backendRouteData.isActive = routeData.isActive;
+      if (routeData.description !== undefined) backendRouteData.description = routeData.description;
+      
+      const response = await api.put(`/routes/${id}`, backendRouteData);
+      const route = response.data.data;
+      
+      // Return with frontend field names
+      return {
+        _id: route._id,
+        name: route.routeName,
+        code: route.routeNumber,
+        startLocation: route.startPoint,
+        endLocation: route.endPoint,
+        distance: route.distance,
+        estimatedDuration: route.estimatedDuration,
+        isActive: route.isActive,
+        description: route.description,
+        createdAt: route.createdAt,
+        updatedAt: route.updatedAt
+      };
     } catch (error) {
       console.error(`Error updating route with id ${id}:`, error);
       throw error;
