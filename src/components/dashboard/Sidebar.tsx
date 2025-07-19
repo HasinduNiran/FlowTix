@@ -17,7 +17,7 @@ export default function Sidebar({ role }: SidebarProps) {
   const superAdminLinks = [
     { name: 'Dashboard', href: '/super-admin/dashboard', icon: '📊' },
     { name: 'Users', href: '/super-admin/users', icon: '👥' },
-    { name: 'Bus Companies', href: '/super-admin/companies', icon: '🚌' },
+    { name: 'Buses', href: '/super-admin/buses', icon: '🚌' },
     { name: 'Routes', href: '/super-admin/routes', icon: '🗺️' },
     { name: 'Reports', href: '/super-admin/reports', icon: '📝' },
     { name: 'Settings', href: '/super-admin/settings', icon: '⚙️' },
