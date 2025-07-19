@@ -4,22 +4,19 @@ import React, { useState, useEffect } from 'react';
 import { Bus } from '@/services/bus.service';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { useRouter } from 'next/navigation';
 
-interface BusFormModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (busData: Partial<Bus>) => Promise<void>;
+interface BusFormProps {
   initialData?: Bus | null;
   isEditing: boolean;
+  onSubmit: (busData: Partial<Bus>) => Promise<void>;
 }
 
-export default function BusFormModal({ 
-  isOpen, 
-  onClose, 
-  onSubmit, 
+export default function BusForm({ 
   initialData = null, 
-  isEditing = false 
-}: BusFormModalProps) {
+  isEditing = false,
+  onSubmit
+}: BusFormProps) {
   const [formData, setFormData] = useState({
     busNumber: '',
     busName: '',
@@ -36,6 +33,7 @@ export default function BusFormModal({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     if (initialData && isEditing) {
@@ -52,24 +50,8 @@ export default function BusFormModal({
         status: initialData.status,
         notes: initialData.notes || ''
       });
-    } else {
-      // Reset form for add mode
-      setFormData({
-        busNumber: '',
-        busName: '',
-        telephoneNumber: '',
-        category: '',
-        ownerId: '',
-        routeId: '',
-        seatCapacity: 0,
-        driverName: '',
-        conductorId: '',
-        status: 'active',
-        notes: ''
-      });
     }
-    setError(null);
-  }, [initialData, isEditing, isOpen]);
+  }, [initialData, isEditing]);
 
   const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({
@@ -86,7 +68,7 @@ export default function BusFormModal({
 
     try {
       await onSubmit(formData);
-      onClose();
+      router.push('/super-admin/buses');
     } catch (err: any) {
       setError(err.message || 'An error occurred while saving the bus');
     } finally {
@@ -94,43 +76,49 @@ export default function BusFormModal({
     }
   };
 
-  if (!isOpen) return null;
+  const handleCancel = () => {
+    router.push('/super-admin/buses');
+  };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden">
-        {/* Enhanced Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-6">
-          <div className="flex justify-between items-center text-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center mb-4">
+            <Button 
+              onClick={handleCancel} 
+              variant="outline" 
+              className="mr-4 hover:bg-gray-50 transition-colors duration-200"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to Buses
+            </Button>
+          </div>
+          
+          <div className="bg-white shadow-lg rounded-2xl p-8 border border-gray-200">
             <div className="flex items-center">
-              <div className="bg-white bg-opacity-20 p-3 rounded-2xl mr-4">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="bg-gradient-to-r from-blue-100 to-purple-100 p-4 rounded-2xl mr-6">
+                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2v0a2 2 0 01-2-2v-2a2 2 0 00-2-2H8z" />
                 </svg>
               </div>
               <div>
-                <h2 className="text-2xl font-bold">
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">
                   {isEditing ? 'Edit Bus Details' : 'Add New Bus'}
-                </h2>
-                <p className="text-blue-100 text-sm">
+                </h1>
+                <p className="text-gray-600">
                   {isEditing ? 'Update bus information and settings' : 'Create a new bus entry in the system'}
                 </p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="text-white hover:bg-white hover:bg-opacity-20 rounded-xl p-2 transition-all duration-200"
-              aria-label="Close modal"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
           </div>
         </div>
 
-        {/* Form Content */}
-        <div className="p-8 max-h-[calc(95vh-120px)] overflow-y-auto">
+        {/* Form */}
+        <div className="bg-white shadow-lg rounded-2xl p-8 border border-gray-200">
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-2xl flex items-center">
               <svg className="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -392,11 +380,11 @@ export default function BusFormModal({
               </div>
             </div>
 
-            {/* Enhanced Footer */}
+            {/* Form Actions */}
             <div className="mt-8 flex justify-end space-x-4 pt-6 border-t border-gray-200">
               <Button
                 type="button"
-                onClick={onClose}
+                onClick={handleCancel}
                 disabled={isSubmitting}
                 className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-medium transition-all duration-200"
               >
