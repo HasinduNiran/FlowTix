@@ -50,24 +50,8 @@ export default function BusForm({
     isLoading: boolean;
   }>({ isValid: false, message: '', isLoading: false });
 
-  const [routeNumber, setRouteNumber] = useState('');
-  const [routeSuggestions, setRouteSuggestions] = useState<Route[]>([]);
-  const [showRouteSuggestions, setShowRouteSuggestions] = useState(false);
-  const [routeValidation, setRouteValidation] = useState<{
-    isValid: boolean;
-    message: string;
-    isLoading: boolean;
-  }>({ isValid: false, message: '', isLoading: false });
-
-  const [busNumberValidation, setBusNumberValidation] = useState<{
-    isValid: boolean;
-    message: string;
-  }>({ isValid: false, message: '' });
-
-  const [telephoneValidation, setTelephoneValidation] = useState<{
-    isValid: boolean;
-    message: string;
-  }>({ isValid: false, message: '' });
+  const [availableRoutes, setAvailableRoutes] = useState<Route[]>([]);
+  const [routesLoading, setRoutesLoading] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,80 +82,8 @@ export default function BusForm({
         setConductorUsername(initialData.conductorId.username);
         setConductorValidation({ isValid: true, message: 'Valid conductor', isLoading: false });
       }
-      // Set route number for display when editing
-      if (typeof initialData.routeId === 'object' && initialData.routeId.routeNumber) {
-        setRouteNumber(initialData.routeId.routeNumber);
-        setRouteValidation({ isValid: true, message: 'Valid route', isLoading: false });
-      }
-      // Validate initial bus number format
-      if (initialData.busNumber) {
-        validateBusNumber(initialData.busNumber);
-      }
-      // Validate initial telephone number
-      if (initialData.telephoneNumber) {
-        validateTelephone(initialData.telephoneNumber);
-      }
     }
   }, [initialData, isEditing]);
-
-  // Fetch owner suggestions when typing
-  useEffect(() => {
-    const fetchOwnerSuggestions = async () => {
-      if (ownerUsername.trim().length >= 1) {
-        try {
-          const suggestions = await UserService.searchUsersByRole('owner', ownerUsername);
-          setOwnerSuggestions(suggestions.slice(0, 5)); // Limit to 5 suggestions
-        } catch (error) {
-          console.error('Error fetching owner suggestions:', error);
-          setOwnerSuggestions([]);
-        }
-      } else {
-        setOwnerSuggestions([]);
-      }
-    };
-
-    const timeoutId = setTimeout(fetchOwnerSuggestions, 300);
-    return () => clearTimeout(timeoutId);
-  }, [ownerUsername]);
-
-  // Fetch conductor suggestions when typing
-  useEffect(() => {
-    const fetchConductorSuggestions = async () => {
-      if (conductorUsername.trim().length >= 1) {
-        try {
-          const suggestions = await UserService.searchUsersByRole('conductor', conductorUsername);
-          
-          // Get all active buses to check for already assigned conductors
-          const allBuses = await BusService.getAllBuses();
-          const activeBuses = allBuses.filter((bus: Bus) => 
-            bus.status === 'active' && 
-            // Exclude current bus if editing (don't restrict current conductor)
-            (!isEditing || bus._id !== initialData?._id)
-          );
-          
-          // Get IDs of conductors already assigned to active buses
-          const assignedConductorIds = activeBuses
-            .map((bus: Bus) => typeof bus.conductorId === 'string' ? bus.conductorId : bus.conductorId._id)
-            .filter(Boolean);
-          
-          // Filter out already assigned conductors
-          const availableSuggestions = suggestions.filter(user => 
-            !assignedConductorIds.includes(user._id)
-          );
-          
-          setConductorSuggestions(availableSuggestions.slice(0, 5)); // Limit to 5 suggestions
-        } catch (error) {
-          console.error('Error fetching conductor suggestions:', error);
-          setConductorSuggestions([]);
-        }
-      } else {
-        setConductorSuggestions([]);
-      }
-    };
-
-    const timeoutId = setTimeout(fetchConductorSuggestions, 300);
-    return () => clearTimeout(timeoutId);
-  }, [conductorUsername, isEditing, initialData]);
 
   // Debounced username validation
   useEffect(() => {
@@ -259,58 +171,7 @@ export default function BusForm({
 
     const timeoutId = setTimeout(validateConductor, 500);
     return () => clearTimeout(timeoutId);
-  }, [conductorUsername, isEditing, initialData]);
-
-  // Fetch route suggestions when typing
-  useEffect(() => {
-    const fetchRouteSuggestions = async () => {
-      if (routeNumber.trim().length >= 1) {
-        try {
-          const suggestions = await RouteService.searchRoutesByNumber(routeNumber);
-          setRouteSuggestions(suggestions.slice(0, 5)); // Limit to 5 suggestions
-        } catch (error) {
-          console.error('Error fetching route suggestions:', error);
-          setRouteSuggestions([]);
-        }
-      } else {
-        setRouteSuggestions([]);
-      }
-    };
-
-    const timeoutId = setTimeout(fetchRouteSuggestions, 300);
-    return () => clearTimeout(timeoutId);
-  }, [routeNumber]);
-
-  // Debounced route validation
-  useEffect(() => {
-    const validateRoute = async () => {
-      if (!routeNumber.trim()) {
-        setRouteValidation({ isValid: false, message: '', isLoading: false });
-        setFormData(prev => ({ ...prev, routeId: '' }));
-        return;
-      }
-
-      setRouteValidation({ isValid: false, message: '', isLoading: true });
-
-      try {
-        const routes = await RouteService.getAllRoutes();
-        const route = routes.find(r => r.code === routeNumber && r.isActive);
-        if (route) {
-          setRouteValidation({ isValid: true, message: 'Valid route', isLoading: false });
-          setFormData(prev => ({ ...prev, routeId: route._id }));
-        } else {
-          setRouteValidation({ isValid: false, message: 'Route not found or inactive', isLoading: false });
-          setFormData(prev => ({ ...prev, routeId: '' }));
-        }
-      } catch (error) {
-        setRouteValidation({ isValid: false, message: 'Error validating route', isLoading: false });
-        setFormData(prev => ({ ...prev, routeId: '' }));
-      }
-    };
-
-    const timeoutId = setTimeout(validateRoute, 500);
-    return () => clearTimeout(timeoutId);
-  }, [routeNumber]);
+  }, [conductorUsername]);
 
   const handleInputChange = (field: string, value: string | number) => {
     if (field === 'busNumber' && typeof value === 'string') {
@@ -428,22 +289,8 @@ export default function BusForm({
     }
 
     // Validate that a route is selected
-    if (!routeValidation.isValid || !formData.routeId) {
-      setError('Please enter a valid route number');
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Validate bus number format
-    if (!busNumberValidation.isValid || !formData.busNumber) {
-      setError('Please enter a valid bus number in format XX-#### (e.g., KP-5677)');
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Validate telephone number
-    if (!telephoneValidation.isValid || !formData.telephoneNumber) {
-      setError('Please enter a valid 10-digit telephone number');
+    if (!formData.routeId) {
+      setError('Please select a route');
       setIsSubmitting(false);
       return;
     }
@@ -810,58 +657,6 @@ export default function BusForm({
                             : 'border-green-200 focus:border-green-400'
                         }`}
                       />
-                      
-                      {/* Autocomplete Suggestions */}
-                      {showConductorSuggestions && conductorSuggestions.length > 0 && (
-                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-xl shadow-lg max-h-48 overflow-y-auto">
-                          {conductorSuggestions.map((user) => (
-                            <div
-                              key={user._id}
-                              className="px-4 py-3 hover:bg-green-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
-                              onClick={() => {
-                                setConductorUsername(user.username);
-                                setFormData(prev => ({ ...prev, conductorId: user._id }));
-                                setConductorValidation({ isValid: true, message: 'Valid conductor', isLoading: false });
-                                setShowConductorSuggestions(false);
-                              }}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <div className="font-medium text-gray-900">{user.username}</div>
-                                  <div className="text-sm text-gray-500 capitalize">Role: {user.role}</div>
-                                </div>
-                                <div className="flex items-center">
-                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                    user.isActive 
-                                      ? 'bg-green-100 text-green-800' 
-                                      : 'bg-gray-100 text-gray-800'
-                                  }`}>
-                                    {user.isActive ? 'Available' : 'Inactive'}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      
-                      {/* No available conductors message */}
-                      {showConductorSuggestions && conductorSuggestions.length === 0 && conductorUsername.trim().length >= 1 && (
-                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-xl shadow-lg">
-                          <div className="px-4 py-3 text-center text-gray-500">
-                            <div className="flex items-center justify-center">
-                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              No available conductors found
-                            </div>
-                            <div className="text-xs mt-1">
-                              Matching conductors may already be assigned to other active buses
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      
                       <div className="absolute inset-y-0 right-0 flex items-center pr-3">
                         {conductorValidation.isLoading ? (
                           <div className="animate-spin rounded-full h-4 w-4 border-2 border-yellow-400 border-t-transparent"></div>
