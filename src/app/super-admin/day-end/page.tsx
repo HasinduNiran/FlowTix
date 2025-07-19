@@ -15,7 +15,8 @@ export default function DayEndPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [dateFilter, setDateFilter] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [startDateFilter, setStartDateFilter] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [endDateFilter, setEndDateFilter] = useState<string>(new Date().toISOString().split('T')[0]);
   const [buses, setBuses] = useState<any[]>([]);
 
   // Fetch initial data on component mount
@@ -24,15 +25,19 @@ export default function DayEndPage() {
     fetchBuses();
   }, []);
 
-  // Fetch day end records when date filter changes
+  // Fetch day end records when date filters change
   useEffect(() => {
     fetchDayEndRecords();
-  }, [dateFilter]);
+  }, [startDateFilter, endDateFilter]);
 
   const fetchDayEndRecords = async () => {
     setLoading(true);
     try {
-      const data = await DayEndService.getAllDayEnds({ date: dateFilter });
+      const filters: any = {};
+      if (startDateFilter) filters.startDate = startDateFilter;
+      if (endDateFilter) filters.endDate = endDateFilter;
+      
+      const data = await DayEndService.getAllDayEnds(filters);
       setDayEndRecords(data);
       setError(null);
     } catch (err) {
@@ -278,16 +283,29 @@ export default function DayEndPage() {
 
           {/* Filters Section */}
           <div className="bg-gray-50 border-b border-gray-200 p-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               <div>
-                <label htmlFor="dateFilter" className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Date
+                <label htmlFor="startDateFilter" className="block text-sm font-medium text-gray-700 mb-2">
+                  Start Date
                 </label>
                 <Input
-                  id="dateFilter"
+                  id="startDateFilter"
                   type="date"
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
+                  value={startDateFilter}
+                  onChange={(e) => setStartDateFilter(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="endDateFilter" className="block text-sm font-medium text-gray-700 mb-2">
+                  End Date
+                </label>
+                <Input
+                  id="endDateFilter"
+                  type="date"
+                  value={endDateFilter}
+                  onChange={(e) => setEndDateFilter(e.target.value)}
                   className="w-full"
                 />
               </div>
@@ -328,6 +346,9 @@ export default function DayEndPage() {
                   onClick={() => {
                     setSearchTerm('');
                     setStatusFilter('all');
+                    const today = new Date().toISOString().split('T')[0];
+                    setStartDateFilter(today);
+                    setEndDateFilter(today);
                   }}
                   variant="outline"
                   className="w-full flex items-center justify-center space-x-2"
@@ -385,7 +406,7 @@ export default function DayEndPage() {
                   </span>
                 )}
                 <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                  Date: {formatDate(dateFilter)}
+                  Date Range: {formatDate(startDateFilter)} - {formatDate(endDateFilter)}
                 </span>
               </div>
             </div>
