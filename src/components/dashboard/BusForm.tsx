@@ -50,8 +50,24 @@ export default function BusForm({
     isLoading: boolean;
   }>({ isValid: false, message: '', isLoading: false });
 
-  const [availableRoutes, setAvailableRoutes] = useState<Route[]>([]);
-  const [routesLoading, setRoutesLoading] = useState(false);
+  const [routeNumber, setRouteNumber] = useState('');
+  const [routeSuggestions, setRouteSuggestions] = useState<Route[]>([]);
+  const [showRouteSuggestions, setShowRouteSuggestions] = useState(false);
+  const [routeValidation, setRouteValidation] = useState<{
+    isValid: boolean;
+    message: string;
+    isLoading: boolean;
+  }>({ isValid: false, message: '', isLoading: false });
+
+  const [busNumberValidation, setBusNumberValidation] = useState<{
+    isValid: boolean;
+    message: string;
+  }>({ isValid: false, message: '' });
+
+  const [telephoneValidation, setTelephoneValidation] = useState<{
+    isValid: boolean;
+    message: string;
+  }>({ isValid: false, message: '' });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +97,19 @@ export default function BusForm({
       if (typeof initialData.conductorId === 'object' && initialData.conductorId.username) {
         setConductorUsername(initialData.conductorId.username);
         setConductorValidation({ isValid: true, message: 'Valid conductor', isLoading: false });
+      }
+      // Set route number for display when editing
+      if (typeof initialData.routeId === 'object' && initialData.routeId.routeNumber) {
+        setRouteNumber(initialData.routeId.routeNumber);
+        setRouteValidation({ isValid: true, message: 'Valid route', isLoading: false });
+      }
+      // Validate initial bus number format
+      if (initialData.busNumber) {
+        validateBusNumber(initialData.busNumber);
+      }
+      // Validate initial telephone number
+      if (initialData.telephoneNumber) {
+        validateTelephone(initialData.telephoneNumber);
       }
     }
   }, [initialData, isEditing]);
@@ -172,6 +201,57 @@ export default function BusForm({
     const timeoutId = setTimeout(validateConductor, 500);
     return () => clearTimeout(timeoutId);
   }, [conductorUsername]);
+
+  // Fetch route suggestions when typing
+  useEffect(() => {
+    const fetchRouteSuggestions = async () => {
+      if (routeNumber.trim().length >= 1) {
+        try {
+          const suggestions = await RouteService.searchRoutesByNumber(routeNumber);
+          setRouteSuggestions(suggestions.slice(0, 5)); // Limit to 5 suggestions
+        } catch (error) {
+          console.error('Error fetching route suggestions:', error);
+          setRouteSuggestions([]);
+        }
+      } else {
+        setRouteSuggestions([]);
+      }
+    };
+
+    const timeoutId = setTimeout(fetchRouteSuggestions, 300);
+    return () => clearTimeout(timeoutId);
+  }, [routeNumber]);
+
+  // Debounced route validation
+  useEffect(() => {
+    const validateRoute = async () => {
+      if (!routeNumber.trim()) {
+        setRouteValidation({ isValid: false, message: '', isLoading: false });
+        setFormData(prev => ({ ...prev, routeId: '' }));
+        return;
+      }
+
+      setRouteValidation({ isValid: false, message: '', isLoading: true });
+
+      try {
+        const routes = await RouteService.getAllRoutes();
+        const route = routes.find(r => r.code === routeNumber && r.isActive);
+        if (route) {
+          setRouteValidation({ isValid: true, message: 'Valid route', isLoading: false });
+          setFormData(prev => ({ ...prev, routeId: route._id }));
+        } else {
+          setRouteValidation({ isValid: false, message: 'Route not found or inactive', isLoading: false });
+          setFormData(prev => ({ ...prev, routeId: '' }));
+        }
+      } catch (error) {
+        setRouteValidation({ isValid: false, message: 'Error validating route', isLoading: false });
+        setFormData(prev => ({ ...prev, routeId: '' }));
+      }
+    };
+
+    const timeoutId = setTimeout(validateRoute, 500);
+    return () => clearTimeout(timeoutId);
+  }, [routeNumber]);
 
   const handleInputChange = (field: string, value: string | number) => {
     if (field === 'busNumber' && typeof value === 'string') {
@@ -272,6 +352,16 @@ export default function BusForm({
       routeHasId: !!formData.routeId
     });
     
+    console.log('Form submit triggered');
+    console.log('Validation states:', {
+      ownerValid: ownerValidation.isValid,
+      ownerHasId: !!formData.ownerId,
+      conductorValid: conductorValidation.isValid,
+      conductorHasId: !!formData.conductorId,
+      routeValid: routeValidation.isValid,
+      routeHasId: !!formData.routeId
+    });
+    
     setIsSubmitting(true);
     setError(null);
 
@@ -289,8 +379,22 @@ export default function BusForm({
     }
 
     // Validate that a route is selected
-    if (!formData.routeId) {
-      setError('Please select a route');
+    if (!routeValidation.isValid || !formData.routeId) {
+      setError('Please enter a valid route number');
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Validate bus number format
+    if (!busNumberValidation.isValid || !formData.busNumber) {
+      setError('Please enter a valid bus number in format XX-#### (e.g., KP-5677)');
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Validate telephone number
+    if (!telephoneValidation.isValid || !formData.telephoneNumber) {
+      setError('Please enter a valid 10-digit telephone number');
       setIsSubmitting(false);
       return;
     }
@@ -378,14 +482,45 @@ export default function BusForm({
                       </svg>
                       Bus Number *
                     </label>
-                    <Input
-                      type="text"
-                      value={formData.busNumber}
-                      onChange={(e) => handleInputChange('busNumber', e.target.value)}
-                      placeholder="e.g., NB 1234"
-                      required
-                      className="bg-white border-2 border-blue-200 focus:border-blue-400 rounded-xl px-4 py-3 transition-all duration-200"
-                    />
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        value={formData.busNumber}
+                        onChange={(e) => handleInputChange('busNumber', e.target.value)}
+                        placeholder="e.g., KP-5677"
+                        required
+                        maxLength={7}
+                        className={`bg-white border-2 rounded-xl px-4 py-3 pr-10 transition-all duration-200 ${
+                          busNumberValidation.isValid 
+                            ? 'border-green-300 focus:border-green-400' 
+                            : formData.busNumber && !busNumberValidation.isValid 
+                            ? 'border-red-300 focus:border-red-400'
+                            : 'border-blue-200 focus:border-blue-400'
+                        }`}
+                      />
+                      
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                        {busNumberValidation.isValid ? (
+                          <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : formData.busNumber && !busNumberValidation.isValid ? (
+                          <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        ) : null}
+                      </div>
+                    </div>
+                    {formData.busNumber && busNumberValidation.message && (
+                      <p className={`mt-1 text-xs ${
+                        busNumberValidation.isValid ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {busNumberValidation.message}
+                      </p>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500">
+                      Format: Two uppercase letters, dash, four digits (e.g., KP-5677)
+                    </p>
                   </div>
 
                   <div>
@@ -467,6 +602,45 @@ export default function BusForm({
                       </svg>
                       Telephone Number *
                     </label>
+                    <div className="relative">
+                      <Input
+                        type="tel"
+                        value={formData.telephoneNumber}
+                        onChange={(e) => handleInputChange('telephoneNumber', e.target.value)}
+                        placeholder="e.g., 0771234567"
+                        required
+                        maxLength={10}
+                        className={`bg-white border-2 rounded-xl px-4 py-3 pr-10 transition-all duration-200 ${
+                          telephoneValidation.isValid 
+                            ? 'border-green-300 focus:border-green-400' 
+                            : formData.telephoneNumber && !telephoneValidation.isValid 
+                            ? 'border-red-300 focus:border-red-400'
+                            : 'border-green-200 focus:border-green-400'
+                        }`}
+                      />
+                      
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                        {telephoneValidation.isValid ? (
+                          <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : formData.telephoneNumber && !telephoneValidation.isValid ? (
+                          <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        ) : null}
+                      </div>
+                    </div>
+                    {formData.telephoneNumber && telephoneValidation.message && (
+                      <p className={`mt-1 text-xs ${
+                        telephoneValidation.isValid ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {telephoneValidation.message}
+                      </p>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500">
+                      Enter exactly 10 digits (numbers only)
+                    </p>
                     <div className="relative">
                       <Input
                         type="tel"
@@ -856,9 +1030,23 @@ export default function BusForm({
                 Cancel
               </Button>
               <Button
+                type="button"
+                variant="outline"
+                onClick={handleCancel}
+                disabled={isSubmitting}
+                className="px-8 py-3"
+              >
+                Cancel
+              </Button>
+              <Button
                 type="submit"
                 variant="primary"
+                variant="primary"
                 disabled={isSubmitting}
+                isLoading={isSubmitting}
+                className="px-8 py-3"
+              >
+                {isEditing ? 'Update Bus' : 'Create Bus'}
                 isLoading={isSubmitting}
                 className="px-8 py-3"
               >
