@@ -35,6 +35,10 @@ export default function BusForm({
 
   const [ownerUsername, setOwnerUsername] = useState('');
   const [conductorUsername, setConductorUsername] = useState('');
+  const [ownerSuggestions, setOwnerSuggestions] = useState<UserLookup[]>([]);
+  const [conductorSuggestions, setConductorSuggestions] = useState<UserLookup[]>([]);
+  const [showOwnerSuggestions, setShowOwnerSuggestions] = useState(false);
+  const [showConductorSuggestions, setShowConductorSuggestions] = useState(false);
   const [ownerValidation, setOwnerValidation] = useState<{
     isValid: boolean;
     message: string;
@@ -46,29 +50,18 @@ export default function BusForm({
     isLoading: boolean;
   }>({ isValid: false, message: '', isLoading: false });
 
-  const [availableRoutes, setAvailableRoutes] = useState<Route[]>([]);
-  const [routesLoading, setRoutesLoading] = useState(false);
+  const [routeNumber, setRouteNumber] = useState('');
+  const [routeSuggestions, setRouteSuggestions] = useState<Route[]>([]);
+  const [showRouteSuggestions, setShowRouteSuggestions] = useState(false);
+  const [routeValidation, setRouteValidation] = useState<{
+    isValid: boolean;
+    message: string;
+    isLoading: boolean;
+  }>({ isValid: false, message: '', isLoading: false });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-
-  useEffect(() => {
-    fetchAvailableRoutes();
-  }, []);
-
-  const fetchAvailableRoutes = async () => {
-    try {
-      setRoutesLoading(true);
-      const routes = await RouteService.getAllRoutes();
-      setAvailableRoutes(routes.filter(route => route.isActive));
-    } catch (error) {
-      console.error('Error fetching routes:', error);
-      setError('Failed to load available routes');
-    } finally {
-      setRoutesLoading(false);
-    }
-  };
 
   useEffect(() => {
     if (initialData && isEditing) {
@@ -95,8 +88,53 @@ export default function BusForm({
         setConductorUsername(initialData.conductorId.username);
         setConductorValidation({ isValid: true, message: 'Valid conductor', isLoading: false });
       }
+      // Set route number for display when editing
+      if (typeof initialData.routeId === 'object' && initialData.routeId.routeNumber) {
+        setRouteNumber(initialData.routeId.routeNumber);
+        setRouteValidation({ isValid: true, message: 'Valid route', isLoading: false });
+      }
     }
   }, [initialData, isEditing]);
+
+  // Fetch owner suggestions when typing
+  useEffect(() => {
+    const fetchOwnerSuggestions = async () => {
+      if (ownerUsername.trim().length >= 1) {
+        try {
+          const suggestions = await UserService.searchUsersByRole('owner', ownerUsername);
+          setOwnerSuggestions(suggestions.slice(0, 5)); // Limit to 5 suggestions
+        } catch (error) {
+          console.error('Error fetching owner suggestions:', error);
+          setOwnerSuggestions([]);
+        }
+      } else {
+        setOwnerSuggestions([]);
+      }
+    };
+
+    const timeoutId = setTimeout(fetchOwnerSuggestions, 300);
+    return () => clearTimeout(timeoutId);
+  }, [ownerUsername]);
+
+  // Fetch conductor suggestions when typing
+  useEffect(() => {
+    const fetchConductorSuggestions = async () => {
+      if (conductorUsername.trim().length >= 1) {
+        try {
+          const suggestions = await UserService.searchUsersByRole('conductor', conductorUsername);
+          setConductorSuggestions(suggestions.slice(0, 5)); // Limit to 5 suggestions
+        } catch (error) {
+          console.error('Error fetching conductor suggestions:', error);
+          setConductorSuggestions([]);
+        }
+      } else {
+        setConductorSuggestions([]);
+      }
+    };
+
+    const timeoutId = setTimeout(fetchConductorSuggestions, 300);
+    return () => clearTimeout(timeoutId);
+  }, [conductorUsername]);
 
   // Debounced username validation
   useEffect(() => {
@@ -163,6 +201,57 @@ export default function BusForm({
     return () => clearTimeout(timeoutId);
   }, [conductorUsername]);
 
+  // Fetch route suggestions when typing
+  useEffect(() => {
+    const fetchRouteSuggestions = async () => {
+      if (routeNumber.trim().length >= 1) {
+        try {
+          const suggestions = await RouteService.searchRoutesByNumber(routeNumber);
+          setRouteSuggestions(suggestions.slice(0, 5)); // Limit to 5 suggestions
+        } catch (error) {
+          console.error('Error fetching route suggestions:', error);
+          setRouteSuggestions([]);
+        }
+      } else {
+        setRouteSuggestions([]);
+      }
+    };
+
+    const timeoutId = setTimeout(fetchRouteSuggestions, 300);
+    return () => clearTimeout(timeoutId);
+  }, [routeNumber]);
+
+  // Debounced route validation
+  useEffect(() => {
+    const validateRoute = async () => {
+      if (!routeNumber.trim()) {
+        setRouteValidation({ isValid: false, message: '', isLoading: false });
+        setFormData(prev => ({ ...prev, routeId: '' }));
+        return;
+      }
+
+      setRouteValidation({ isValid: false, message: '', isLoading: true });
+
+      try {
+        const routes = await RouteService.getAllRoutes();
+        const route = routes.find(r => r.code === routeNumber && r.isActive);
+        if (route) {
+          setRouteValidation({ isValid: true, message: 'Valid route', isLoading: false });
+          setFormData(prev => ({ ...prev, routeId: route._id }));
+        } else {
+          setRouteValidation({ isValid: false, message: 'Route not found or inactive', isLoading: false });
+          setFormData(prev => ({ ...prev, routeId: '' }));
+        }
+      } catch (error) {
+        setRouteValidation({ isValid: false, message: 'Error validating route', isLoading: false });
+        setFormData(prev => ({ ...prev, routeId: '' }));
+      }
+    };
+
+    const timeoutId = setTimeout(validateRoute, 500);
+    return () => clearTimeout(timeoutId);
+  }, [routeNumber]);
+
   const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({
       ...prev,
@@ -190,8 +279,8 @@ export default function BusForm({
     }
 
     // Validate that a route is selected
-    if (!formData.routeId) {
-      setError('Please select a route');
+    if (!routeValidation.isValid || !formData.routeId) {
+      setError('Please enter a valid route number');
       setIsSubmitting(false);
       return;
     }
@@ -320,10 +409,11 @@ export default function BusForm({
                       className="w-full bg-white border-2 border-blue-200 focus:border-blue-400 rounded-xl px-4 py-3 transition-all duration-200 focus:outline-none"
                     >
                       <option value="">Select Category</option>
+                      <option value="normal">Normal</option>
                       <option value="luxury">Luxury</option>
                       <option value="semi_luxury">Semi Luxury</option>
-                      <option value="normal">Normal</option>
-                      <option value="express">Express</option>
+                      <option value="high_luxury">High Luxury</option>
+                      <option value="sisu_sariya">Sisu Sariya</option>
                     </select>
                   </div>
 
@@ -407,7 +497,17 @@ export default function BusForm({
                         value={ownerUsername}
                         onChange={(e) => {
                           setOwnerUsername(e.target.value);
+                          setShowOwnerSuggestions(true);
                           setError(null);
+                        }}
+                        onFocus={() => {
+                          if (ownerSuggestions.length > 0) {
+                            setShowOwnerSuggestions(true);
+                          }
+                        }}
+                        onBlur={() => {
+                          // Delay hiding suggestions to allow clicking
+                          setTimeout(() => setShowOwnerSuggestions(false), 200);
                         }}
                         placeholder="e.g., john_owner"
                         required
@@ -421,6 +521,41 @@ export default function BusForm({
                             : 'border-green-200 focus:border-green-400'
                         }`}
                       />
+                      
+                      {/* Autocomplete Suggestions */}
+                      {showOwnerSuggestions && ownerSuggestions.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                          {ownerSuggestions.map((user) => (
+                            <div
+                              key={user._id}
+                              className="px-4 py-3 hover:bg-green-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                              onClick={() => {
+                                setOwnerUsername(user.username);
+                                setFormData(prev => ({ ...prev, ownerId: user._id }));
+                                setOwnerValidation({ isValid: true, message: 'Valid owner', isLoading: false });
+                                setShowOwnerSuggestions(false);
+                              }}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="font-medium text-gray-900">{user.username}</div>
+                                  <div className="text-sm text-gray-500 capitalize">Role: {user.role}</div>
+                                </div>
+                                <div className="flex items-center">
+                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                    user.isActive 
+                                      ? 'bg-green-100 text-green-800' 
+                                      : 'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {user.isActive ? 'Active' : 'Inactive'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
                       <div className="absolute inset-y-0 right-0 flex items-center pr-3">
                         {ownerValidation.isLoading ? (
                           <div className="animate-spin rounded-full h-4 w-4 border-2 border-yellow-400 border-t-transparent"></div>
@@ -457,7 +592,17 @@ export default function BusForm({
                         value={conductorUsername}
                         onChange={(e) => {
                           setConductorUsername(e.target.value);
+                          setShowConductorSuggestions(true);
                           setError(null);
+                        }}
+                        onFocus={() => {
+                          if (conductorSuggestions.length > 0) {
+                            setShowConductorSuggestions(true);
+                          }
+                        }}
+                        onBlur={() => {
+                          // Delay hiding suggestions to allow clicking
+                          setTimeout(() => setShowConductorSuggestions(false), 200);
                         }}
                         placeholder="e.g., jane_conductor"
                         required
@@ -471,6 +616,41 @@ export default function BusForm({
                             : 'border-green-200 focus:border-green-400'
                         }`}
                       />
+                      
+                      {/* Autocomplete Suggestions */}
+                      {showConductorSuggestions && conductorSuggestions.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                          {conductorSuggestions.map((user) => (
+                            <div
+                              key={user._id}
+                              className="px-4 py-3 hover:bg-green-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                              onClick={() => {
+                                setConductorUsername(user.username);
+                                setFormData(prev => ({ ...prev, conductorId: user._id }));
+                                setConductorValidation({ isValid: true, message: 'Valid conductor', isLoading: false });
+                                setShowConductorSuggestions(false);
+                              }}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="font-medium text-gray-900">{user.username}</div>
+                                  <div className="text-sm text-gray-500 capitalize">Role: {user.role}</div>
+                                </div>
+                                <div className="flex items-center">
+                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                    user.isActive 
+                                      ? 'bg-green-100 text-green-800' 
+                                      : 'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {user.isActive ? 'Active' : 'Inactive'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
                       <div className="absolute inset-y-0 right-0 flex items-center pr-3">
                         {conductorValidation.isLoading ? (
                           <div className="animate-spin rounded-full h-4 w-4 border-2 border-yellow-400 border-t-transparent"></div>
@@ -514,33 +694,93 @@ export default function BusForm({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
-                      Route *
+                      Route Number *
                     </label>
-                    {routesLoading ? (
-                      <div className="bg-white border-2 border-purple-200 rounded-xl px-4 py-3">
-                        <div className="flex items-center">
-                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-purple-200 border-t-purple-500 mr-2"></div>
-                          <span className="text-sm text-gray-500">Loading routes...</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <select
-                        value={formData.routeId}
-                        onChange={(e) => handleInputChange('routeId', e.target.value)}
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        value={routeNumber}
+                        onChange={(e) => {
+                          setRouteNumber(e.target.value);
+                          setShowRouteSuggestions(true);
+                          setError(null);
+                        }}
+                        onFocus={() => {
+                          if (routeSuggestions.length > 0) {
+                            setShowRouteSuggestions(true);
+                          }
+                        }}
+                        onBlur={() => {
+                          // Delay hiding suggestions to allow clicking
+                          setTimeout(() => setShowRouteSuggestions(false), 200);
+                        }}
+                        placeholder="e.g., CE-001"
                         required
-                        className="w-full bg-white border-2 border-purple-200 focus:border-purple-400 rounded-xl px-4 py-3 transition-all duration-200 focus:ring-2 focus:ring-purple-200 focus:outline-none"
-                      >
-                        <option value="">Select a route</option>
-                        {availableRoutes.map((route) => (
-                          <option key={route._id} value={route._id}>
-                            {route.code} - {route.name} ({route.startLocation} → {route.endLocation})
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                    {!routesLoading && availableRoutes.length === 0 && (
-                      <p className="mt-1 text-sm text-red-600">
-                        No active routes available. Please create a route first.
+                        className={`bg-white border-2 rounded-xl px-4 py-3 pr-10 transition-all duration-200 ${
+                          routeValidation.isLoading 
+                            ? 'border-yellow-300 focus:border-yellow-400' 
+                            : routeValidation.isValid 
+                            ? 'border-green-300 focus:border-green-400' 
+                            : routeNumber && !routeValidation.isValid 
+                            ? 'border-red-300 focus:border-red-400'
+                            : 'border-purple-200 focus:border-purple-400'
+                        }`}
+                      />
+                      
+                      {/* Autocomplete Suggestions */}
+                      {showRouteSuggestions && routeSuggestions.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                          {routeSuggestions.map((route) => (
+                            <div
+                              key={route._id}
+                              className="px-4 py-3 hover:bg-purple-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                              onClick={() => {
+                                setRouteNumber(route.code);
+                                setFormData(prev => ({ ...prev, routeId: route._id }));
+                                setRouteValidation({ isValid: true, message: 'Valid route', isLoading: false });
+                                setShowRouteSuggestions(false);
+                              }}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="font-medium text-gray-900">{route.code}</div>
+                                  <div className="text-sm text-gray-600">{route.name}</div>
+                                  <div className="text-xs text-gray-500">{route.startLocation} → {route.endLocation}</div>
+                                </div>
+                                <div className="flex items-center">
+                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                    route.isActive 
+                                      ? 'bg-green-100 text-green-800' 
+                                      : 'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {route.isActive ? 'Active' : 'Inactive'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                        {routeValidation.isLoading ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-yellow-400 border-t-transparent"></div>
+                        ) : routeValidation.isValid ? (
+                          <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : routeNumber && !routeValidation.isValid ? (
+                          <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        ) : null}
+                      </div>
+                    </div>
+                    {routeNumber && routeValidation.message && (
+                      <p className={`mt-1 text-xs ${
+                        routeValidation.isValid ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {routeValidation.message}
                       </p>
                     )}
                   </div>
