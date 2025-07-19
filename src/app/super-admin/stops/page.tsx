@@ -304,25 +304,6 @@ export default function StopsPage() {
                           </svg>
                           <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-red-400 to-pink-500 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
                         </button>
-                        
-                        {/* Quick Status Toggle */}
-                        <button
-                          onClick={() => {
-                            // Add quick status toggle functionality if needed
-                            console.log('Toggle status for stop:', stop._id);
-                          }}
-                          className="group relative p-3 text-gray-500 hover:text-purple-600 hover:bg-gradient-to-r hover:from-purple-50 hover:to-violet-100 rounded-xl transition-all duration-300 transform hover:scale-110 hover:shadow-md"
-                          title={stop.isActive ? "Deactivate Stop" : "Activate Stop"}
-                        >
-                          <svg className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            {stop.isActive ? (
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636 5.636 18.364" />
-                            ) : (
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            )}
-                          </svg>
-                          <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-400 to-violet-500 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
-                        </button>
                       </div>
                     </td>
                   </tr>
