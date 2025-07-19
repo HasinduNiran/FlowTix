@@ -159,13 +159,13 @@ export default function BusFormModal({
                       <svg className="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
                       </svg>
-                      Bus Number *
+                      Bus hu *
                     </label>
                     <Input
                       type="text"
                       value={formData.busNumber}
                       onChange={(e) => handleInputChange('busNumber', e.target.value)}
-                      placeholder="e.g., BUS001"
+                      placeholder="e.g., NB 1234"
                       required
                       className="bg-white border-2 border-blue-200 focus:border-blue-400 rounded-xl px-4 py-3 transition-all duration-200"
                     />
