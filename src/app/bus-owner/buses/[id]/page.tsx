@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { BusService, Bus } from '@/services/bus.service';
-import Header from '@/components/dashboard/Header';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 import BusFormModal from '@/components/dashboard/BusFormModal';
@@ -70,7 +69,6 @@ export default function BusOwnerBusDetailPage() {
   if (loading) {
     return (
       <div className="p-6">
-        <Header user={user} />
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
         </div>
@@ -81,7 +79,6 @@ export default function BusOwnerBusDetailPage() {
   if (error || !bus) {
     return (
       <div className="p-6">
-        <Header user={user} />
         <div className="mb-4">
           <Button onClick={handleBackClick} variant="outline">
             ← Back to My Buses
@@ -96,8 +93,6 @@ export default function BusOwnerBusDetailPage() {
 
   return (
     <div className="p-6">
-      <Header user={user} />
-      
       <div className="mb-6 flex items-center">
         <Button onClick={handleBackClick} variant="outline" className="mr-4">
           ← Back to My Buses

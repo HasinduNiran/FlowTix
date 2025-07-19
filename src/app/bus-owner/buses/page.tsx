@@ -3,17 +3,17 @@
 import { useState, useEffect } from 'react';
 import { BusService, Bus } from '@/services/bus.service';
 import DataTable from '@/components/dashboard/DataTable';
-import Header from '@/components/dashboard/Header';
 import { Button } from '@/components/ui/Button';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import React from 'react';
 import BusFormModal from '@/components/dashboard/BusFormModal';
+import BusDetailsModal from '@/components/dashboard/BusDetailsModal';
 
-interface Column {
+interface TableColumn {
   header: string;
-  accessor: keyof Bus | ((item: Bus) => React.ReactNode);
-  cell?: (value: any, row: Bus) => React.ReactNode;
+  accessor: string;
+  cell?: (value: any, row?: Bus) => React.ReactNode;
   className?: string;
 }
 
@@ -23,6 +23,7 @@ export default function BusOwnerBusesPage() {
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedBus, setSelectedBus] = useState<Bus | null>(null);
   const router = useRouter();
   const { user } = useAuth();
@@ -61,8 +62,9 @@ export default function BusOwnerBusesPage() {
     setShowEditModal(true);
   };
 
-  const handleViewDetails = (id: string) => {
-    router.push(`/bus-owner/buses/${id}`);
+  const handleViewDetails = (bus: Bus) => {
+    setSelectedBus(bus);
+    setShowDetailsModal(true);
   };
 
   const handleAddSubmit = async (busData: Partial<Bus>) => {
@@ -99,14 +101,12 @@ export default function BusOwnerBusesPage() {
     }
   };
 
-  const columns: Column[] = [
-    { header: 'Bus Number', accessor: 'busNumber' as keyof Bus },
-    { header: 'Name', accessor: 'busName' as keyof Bus },
-    { header: 'Category', accessor: 'category' as keyof Bus },
-    { header: 'Capacity', accessor: 'seatCapacity' as keyof Bus },
+  const columns: TableColumn[] = [
+    { header: 'Bus Number', accessor: 'busNumber' },
+    { header: 'Bus Name', accessor: 'busName' },
     { 
       header: 'Status', 
-      accessor: 'status' as keyof Bus,
+      accessor: 'status',
       cell: (value: string) => (
         <span className={`px-2 py-1 rounded-full text-xs ${
           value === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
@@ -115,33 +115,41 @@ export default function BusOwnerBusesPage() {
         </span>
       )
     },
-    { header: 'Driver', accessor: 'driverName' as keyof Bus },
+    { header: 'Telephone Number', accessor: 'telephoneNumber' },
     { 
       header: 'Actions',
-      accessor: (bus: Bus) => bus._id,
-      cell: (_, row: Bus) => (
-        <div className="flex space-x-2">
-          <button 
-            onClick={() => handleViewDetails(row._id)}
-            className="text-blue-600 hover:text-blue-800"
-          >
-            View
-          </button>
-          <button 
-            onClick={() => handleEditBus(row)}
-            className="text-green-600 hover:text-green-800"
-          >
-            Edit
-          </button>
-        </div>
-      )
+      accessor: '_id',
+      cell: (id: string, row?: Bus) => {
+        if (!row) return null;
+        return (
+          <div className="flex space-x-3">
+            <button 
+              onClick={() => handleViewDetails(row)}
+              className="text-blue-600 hover:text-blue-800"
+              title="View Details"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+            </button>
+            <button 
+              onClick={() => handleEditBus(row)}
+              className="text-green-600 hover:text-green-800"
+              title="Edit"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
+          </div>
+        );
+      }
     }
   ];
 
   return (
     <div className="p-6">
-      <Header user={user} />
-      
       <div className="mb-6 flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-semibold text-gray-800">My Buses</h2>
@@ -203,6 +211,16 @@ export default function BusOwnerBusesPage() {
           isEditing={true}
         />
       )}
+
+      {/* Details Modal */}
+      <BusDetailsModal
+        isOpen={showDetailsModal}
+        onClose={() => {
+          setShowDetailsModal(false);
+          setSelectedBus(null);
+        }}
+        bus={selectedBus}
+      />
     </div>
   );
 } 
