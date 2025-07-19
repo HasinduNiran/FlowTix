@@ -220,7 +220,7 @@ function RouteSectionsManager() {
               <option value="">Select a Route</option>
               {routes.map((route) => (
                 <option key={route._id} value={route._id}>
-                  {route.routeNumber} - {route.name} ({route.startLocation} → {route.endLocation})
+                  {route.code} - {route.name} ({route.startLocation} → {route.endLocation})
                 </option>
               ))}
             </select>
@@ -397,7 +397,7 @@ function RouteSectionsManager() {
                   <option value="">Select a route</option>
                   {routes.map((route) => (
                     <option key={route._id} value={route._id}>
-                      {route.routeNumber} - {route.name} ({route.startLocation} → {route.endLocation})
+                      {route.code} - {route.name} ({route.startLocation} → {route.endLocation})
                     </option>
                   ))}
                 </select>
