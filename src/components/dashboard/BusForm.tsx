@@ -283,7 +283,7 @@ export default function BusForm({
                       type="text"
                       value={formData.busNumber}
                       onChange={(e) => handleInputChange('busNumber', e.target.value)}
-                      placeholder="e.g., BUS001"
+                      placeholder="e.g., NB 1234"
                       required
                       className="bg-white border-2 border-blue-200 focus:border-blue-400 rounded-xl px-4 py-3 transition-all duration-200"
                     />
