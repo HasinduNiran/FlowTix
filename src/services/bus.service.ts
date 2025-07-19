@@ -3,10 +3,18 @@ import api from './api';
 export interface Bus {
   _id: string;
   busNumber: string;
-  registrationNumber: string;
-  capacity: number;
-  isActive: boolean;
-  owner: string;
+  busName: string;
+  telephoneNumber: string;
+  category: string;
+  ownerId: string;
+  routeId: string;
+  seatCapacity: number;
+  driverName: string;
+  conductorId: string;
+  status: 'active' | 'inactive';
+  notes?: string;
+  lastDayEndDate?: string;
+  resetTripCounter?: boolean;
   createdAt: string;
   updatedAt: string;
 }
