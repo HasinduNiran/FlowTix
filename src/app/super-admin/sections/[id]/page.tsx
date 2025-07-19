@@ -6,7 +6,7 @@ import { SectionService, Section, SectionCategory } from '@/services/section.ser
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
-export default function SectionDetailsPage({ params }: { params: { id: string } }) {
+export default function SectionDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const resolvedParams = React.use(params);
   const id = resolvedParams.id;

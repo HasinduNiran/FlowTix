@@ -1,38 +1,40 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/Button';
+import React, { useState, useEffect } from 'react';
 import { Bus } from '@/services/bus.service';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 
 interface BusFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: Partial<Bus>) => void;
-  initialData?: Bus;
+  onSubmit: (busData: Partial<Bus>) => Promise<void>;
+  initialData?: Bus | null;
   isEditing: boolean;
 }
 
-export default function BusFormModal({
-  isOpen,
-  onClose,
-  onSubmit,
-  initialData,
-  isEditing
+export default function BusFormModal({ 
+  isOpen, 
+  onClose, 
+  onSubmit, 
+  initialData = null, 
+  isEditing = false 
 }: BusFormModalProps) {
-  const [formData, setFormData] = useState<Partial<Bus>>({
+  const [formData, setFormData] = useState({
     busNumber: '',
     busName: '',
     telephoneNumber: '',
-    category: 'normal',
+    category: '',
     ownerId: '',
     routeId: '',
     seatCapacity: 0,
     driverName: '',
     conductorId: '',
-    status: 'active',
+    status: 'active' as 'active' | 'inactive',
     notes: ''
   });
-  const [loading, setLoading] = useState(false);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -48,32 +50,47 @@ export default function BusFormModal({
         driverName: initialData.driverName,
         conductorId: initialData.conductorId,
         status: initialData.status,
-        notes: initialData.notes
+        notes: initialData.notes || ''
+      });
+    } else {
+      // Reset form for add mode
+      setFormData({
+        busNumber: '',
+        busName: '',
+        telephoneNumber: '',
+        category: '',
+        ownerId: '',
+        routeId: '',
+        seatCapacity: 0,
+        driverName: '',
+        conductorId: '',
+        status: 'active',
+        notes: ''
       });
     }
-  }, [initialData, isEditing]);
+    setError(null);
+  }, [initialData, isEditing, isOpen]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
+  const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'seatCapacity' ? parseInt(value, 10) : value
+      [field]: value
     }));
+    setError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setIsSubmitting(true);
     setError(null);
 
     try {
       await onSubmit(formData);
       onClose();
-    } catch (err) {
-      setError('Failed to save bus data. Please try again.');
-      console.error(err);
+    } catch (err: any) {
+      setError(err.message || 'An error occurred while saving the bus');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -81,40 +98,42 @@ export default function BusFormModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-semibold text-gray-800">
-              {isEditing ? 'Edit Bus' : 'Add New Bus'}
-            </h2>
-            <button 
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              ✕
-            </button>
+      <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-semibold text-gray-800">
+            {isEditing ? 'Edit Bus' : 'Add New Bus'}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 text-2xl"
+            aria-label="Close modal"
+          >
+            ×
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
+            {error}
           </div>
+        )}
 
-          {error && (
-            <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left Column */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-800 mb-3">Basic Information</h3>
+              
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Bus Number *
                 </label>
-                <input
+                <Input
                   type="text"
-                  name="busNumber"
                   value={formData.busNumber}
-                  onChange={handleChange}
+                  onChange={(e) => handleInputChange('busNumber', e.target.value)}
+                  placeholder="Enter bus number"
                   required
-                  disabled={isEditing}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
@@ -122,13 +141,12 @@ export default function BusFormModal({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Bus Name *
                 </label>
-                <input
+                <Input
                   type="text"
-                  name="busName"
                   value={formData.busName}
-                  onChange={handleChange}
+                  onChange={(e) => handleInputChange('busName', e.target.value)}
+                  placeholder="Enter bus name"
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
@@ -136,15 +154,12 @@ export default function BusFormModal({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Telephone Number *
                 </label>
-                <input
-                  type="tel"
-                  name="telephoneNumber"
+                <Input
+                  type="text"
                   value={formData.telephoneNumber}
-                  onChange={handleChange}
+                  onChange={(e) => handleInputChange('telephoneNumber', e.target.value)}
+                  placeholder="Enter telephone number"
                   required
-                  pattern="[0-9]{10}"
-                  placeholder="10 digits"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
@@ -153,139 +168,134 @@ export default function BusFormModal({
                   Category *
                 </label>
                 <select
-                  name="category"
                   value={formData.category}
-                  onChange={handleChange}
+                  onChange={(e) => handleInputChange('category', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="normal">Normal</option>
+                  <option value="">Select category</option>
                   <option value="luxury">Luxury</option>
-                  <option value="semi_luxury">Semi Luxury</option>
-                  <option value="high_luxury">High Luxury</option>
-                  <option value="sisu_sariya">Sisu Sariya</option>
+                  <option value="semi-luxury">Semi-Luxury</option>
+                  <option value="normal">Normal</option>
+                  <option value="intercity">Intercity</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => handleInputChange('status', e.target.value as 'active' | 'inactive')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-800 mb-3">Additional Details</h3>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Owner ID
+                </label>
+                <Input
+                  type="text"
+                  value={formData.ownerId}
+                  onChange={(e) => handleInputChange('ownerId', e.target.value)}
+                  placeholder="Enter owner ID"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Route ID
+                </label>
+                <Input
+                  type="text"
+                  value={formData.routeId}
+                  onChange={(e) => handleInputChange('routeId', e.target.value)}
+                  placeholder="Enter route ID"
+                />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Seat Capacity *
                 </label>
-                <input
+                <Input
                   type="number"
-                  name="seatCapacity"
-                  value={formData.seatCapacity}
-                  onChange={handleChange}
-                  required
+                  value={formData.seatCapacity.toString()}
+                  onChange={(e) => handleInputChange('seatCapacity', parseInt(e.target.value) || 0)}
+                  placeholder="Enter seat capacity"
                   min="1"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Driver Name *
+                  Driver Name
                 </label>
-                <input
+                <Input
                   type="text"
-                  name="driverName"
                   value={formData.driverName}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(e) => handleInputChange('driverName', e.target.value)}
+                  placeholder="Enter driver name"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status *
+                  Conductor ID
                 </label>
-                <select
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-
-              {/* Owner and Route selection would go here - would need to fetch from API */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Owner ID *
-                </label>
-                <input
+                <Input
                   type="text"
-                  name="ownerId"
-                  value={formData.ownerId}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Route ID *
-                </label>
-                <input
-                  type="text"
-                  name="routeId"
-                  value={formData.routeId}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Conductor ID *
-                </label>
-                <input
-                  type="text"
-                  name="conductorId"
                   value={formData.conductorId}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(e) => handleInputChange('conductorId', e.target.value)}
+                  placeholder="Enter conductor ID"
                 />
               </div>
             </div>
+          </div>
 
-            <div className="mt-6">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Notes
-              </label>
-              <textarea
-                name="notes"
-                value={formData.notes || ''}
-                onChange={handleChange}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              ></textarea>
-            </div>
+          <div className="mt-6">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Notes
+            </label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => handleInputChange('notes', e.target.value)}
+              placeholder="Enter any additional notes"
+              rows={4}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
 
-            <div className="mt-8 flex justify-end space-x-3">
-              <Button 
-                variant="outline" 
-                onClick={onClose}
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit"
-                isLoading={loading}
-              >
-                {isEditing ? 'Update Bus' : 'Add Bus'}
-              </Button>
-            </div>
-          </form>
-        </div>
+          <div className="flex justify-end gap-4 mt-6">
+            <Button
+              type="button"
+              onClick={onClose}
+              variant="secondary"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {isSubmitting ? 'Saving...' : (isEditing ? 'Update Bus' : 'Add Bus')}
+            </Button>
+          </div>
+        </form>
       </div>
     </div>
   );
-} 
+}

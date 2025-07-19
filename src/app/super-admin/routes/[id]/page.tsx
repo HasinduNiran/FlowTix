@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { RouteService, Route, Section } from '@/services/route.service';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { DataTable } from '@/components/dashboard/DataTable';
 
-export default function RouteDetailsPage({ params }: { params: { id: string } }) {
+export default function RouteDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
-  const { id } = params;
+  const resolvedParams = React.use(params);
+  const id = resolvedParams.id;
   
   const [route, setRoute] = useState<Route | null>(null);
   const [sections, setSections] = useState<Section[]>([]);
@@ -23,8 +24,10 @@ export default function RouteDetailsPage({ params }: { params: { id: string } })
   const [sectionOrder, setSectionOrder] = useState<number>(1);
 
   useEffect(() => {
-    fetchRouteDetails();
-    fetchAllSections();
+    if (id) {
+      fetchRouteDetails();
+      fetchAllSections();
+    }
   }, [id]);
 
   const fetchRouteDetails = async () => {

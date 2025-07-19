@@ -1,16 +1,32 @@
 import api from './api';
 
+export interface Route {
+  _id: string;
+  routeName: string;
+  routeNumber: string;
+  startLocation?: string;
+  endLocation?: string;
+}
+
+export interface User {
+  _id: string;
+  username: string;
+  email?: string;
+  role: string;
+  fullName?: string;
+}
+
 export interface Bus {
   _id: string;
   busNumber: string;
   busName: string;
   telephoneNumber: string;
   category: string;
-  ownerId: string;
-  routeId: string;
+  ownerId: string | User;
+  routeId: string | Route;
   seatCapacity: number;
   driverName: string;
-  conductorId: string;
+  conductorId: string | User;
   status: 'active' | 'inactive';
   notes?: string;
   lastDayEndDate?: string;

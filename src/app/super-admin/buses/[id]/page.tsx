@@ -17,6 +17,31 @@ export default function BusDetailPage() {
   const busId = params.id as string;
   const { user } = useAuth();
 
+  // Helper functions to display the correct value whether it's a string or populated object
+  const getOwnerDisplay = (ownerId: string | any) => {
+    if (typeof ownerId === 'string') return ownerId;
+    if (ownerId && typeof ownerId === 'object' && ownerId.name) {
+      return `${ownerId.name} (${ownerId._id})`;
+    }
+    return 'N/A';
+  };
+
+  const getConductorDisplay = (conductorId: string | any) => {
+    if (typeof conductorId === 'string') return conductorId;
+    if (conductorId && typeof conductorId === 'object' && conductorId.name) {
+      return `${conductorId.name} (${conductorId._id})`;
+    }
+    return 'N/A';
+  };
+
+  const getRouteDisplay = (routeId: string | any) => {
+    if (typeof routeId === 'string') return routeId;
+    if (routeId && typeof routeId === 'object' && routeId.routeName) {
+      return `${routeId.routeName} (${routeId._id})`;
+    }
+    return 'N/A';
+  };
+
   useEffect(() => {
     fetchBusDetails();
   }, [busId]);
@@ -170,11 +195,11 @@ export default function BusDetailPage() {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Owner ID</p>
-                  <p className="text-sm font-medium">{bus.ownerId}</p>
+                  <p className="text-sm font-medium">{getOwnerDisplay(bus.ownerId)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Conductor ID</p>
-                  <p className="text-sm font-medium">{bus.conductorId}</p>
+                  <p className="text-sm font-medium">{getConductorDisplay(bus.conductorId)}</p>
                 </div>
               </div>
             </div>
@@ -184,7 +209,7 @@ export default function BusDetailPage() {
               <div className="space-y-3">
                 <div>
                   <p className="text-xs text-gray-500">Route ID</p>
-                  <p className="text-sm font-medium">{bus.routeId}</p>
+                  <p className="text-sm font-medium">{getRouteDisplay(bus.routeId)}</p>
                 </div>
               </div>
             </div>
