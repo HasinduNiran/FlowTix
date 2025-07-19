@@ -8,7 +8,13 @@ export default function CreateBusPage() {
     try {
       await BusService.createBus(busData as Omit<Bus, '_id' | 'createdAt' | 'updatedAt'>);
     } catch (err: any) {
-      throw new Error(err.message || 'Failed to create bus');
+      // More specific error handling
+      const errorMessage = err?.response?.data?.message || err.message || 'Failed to create bus';
+      
+      // Log the full error for debugging
+      console.error('Full error details:', err?.response?.data || err);
+      
+      throw new Error(errorMessage);
     }
   };
 

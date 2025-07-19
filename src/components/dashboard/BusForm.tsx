@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bus, User as BusUser } from '@/services/bus.service';
 import { UserService, UserLookup } from '@/services/user.service';
+import { RouteService, Route } from '@/services/route.service';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useRouter } from 'next/navigation';
@@ -45,9 +46,29 @@ export default function BusForm({
     isLoading: boolean;
   }>({ isValid: false, message: '', isLoading: false });
 
+  const [availableRoutes, setAvailableRoutes] = useState<Route[]>([]);
+  const [routesLoading, setRoutesLoading] = useState(false);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    fetchAvailableRoutes();
+  }, []);
+
+  const fetchAvailableRoutes = async () => {
+    try {
+      setRoutesLoading(true);
+      const routes = await RouteService.getAllRoutes();
+      setAvailableRoutes(routes.filter(route => route.isActive));
+    } catch (error) {
+      console.error('Error fetching routes:', error);
+      setError('Failed to load available routes');
+    } finally {
+      setRoutesLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (initialData && isEditing) {
@@ -164,6 +185,13 @@ export default function BusForm({
 
     if (!conductorValidation.isValid || !formData.conductorId) {
       setError('Please enter a valid conductor username');
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Validate that a route is selected
+    if (!formData.routeId) {
+      setError('Please select a route');
       setIsSubmitting(false);
       return;
     }
@@ -486,16 +514,35 @@ export default function BusForm({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
-                      Route ID *
+                      Route *
                     </label>
-                    <Input
-                      type="text"
-                      value={formData.routeId}
-                      onChange={(e) => handleInputChange('routeId', e.target.value)}
-                      placeholder="e.g., RT001"
-                      required
-                      className="bg-white border-2 border-purple-200 focus:border-purple-400 rounded-xl px-4 py-3 transition-all duration-200"
-                    />
+                    {routesLoading ? (
+                      <div className="bg-white border-2 border-purple-200 rounded-xl px-4 py-3">
+                        <div className="flex items-center">
+                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-purple-200 border-t-purple-500 mr-2"></div>
+                          <span className="text-sm text-gray-500">Loading routes...</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <select
+                        value={formData.routeId}
+                        onChange={(e) => handleInputChange('routeId', e.target.value)}
+                        required
+                        className="w-full bg-white border-2 border-purple-200 focus:border-purple-400 rounded-xl px-4 py-3 transition-all duration-200 focus:ring-2 focus:ring-purple-200 focus:outline-none"
+                      >
+                        <option value="">Select a route</option>
+                        {availableRoutes.map((route) => (
+                          <option key={route._id} value={route._id}>
+                            {route.code} - {route.name} ({route.startLocation} → {route.endLocation})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {!routesLoading && availableRoutes.length === 0 && (
+                      <p className="mt-1 text-sm text-red-600">
+                        No active routes available. Please create a route first.
+                      </p>
+                    )}
                   </div>
 
                   <div>
