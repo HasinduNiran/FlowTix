@@ -5,7 +5,11 @@ export interface Stop {
   stopCode: string;
   stopName: string;
   sectionNumber: number;
-  routeId?: string;
+  routeId: string | {
+    _id: string;
+    routeName: string;
+    routeNumber: string;
+  };
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
