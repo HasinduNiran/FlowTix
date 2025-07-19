@@ -134,14 +134,6 @@ export default function StopForm({
     }
   };
 
-  const handleBackClick = () => {
-    if (isEdit && initialData) {
-      router.push(`/super-admin/stops/${initialData._id}`);
-    } else {
-      router.push('/super-admin/stops');
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
       <div className="max-w-4xl mx-auto">
@@ -149,14 +141,14 @@ export default function StopForm({
         <div className="mb-8">
           <div className="flex items-center mb-4">
             <Button 
-              onClick={handleBackClick} 
+              onClick={handleCancel} 
               variant="outline" 
               className="mr-4 hover:bg-gray-50 transition-colors duration-200"
             >
               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              Back
+              Back to Stops
             </Button>
           </div>
           
