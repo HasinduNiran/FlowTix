@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Bus, User as BusUser } from '@/services/bus.service';
+import { Bus, User as BusUser, BusService } from '@/services/bus.service';
 import { UserService, UserLookup } from '@/services/user.service';
 import { RouteService, Route } from '@/services/route.service';
 import { Button } from '@/components/ui/Button';
@@ -140,7 +140,26 @@ export default function BusForm({
       if (conductorUsername.trim().length >= 1) {
         try {
           const suggestions = await UserService.searchUsersByRole('conductor', conductorUsername);
-          setConductorSuggestions(suggestions.slice(0, 5)); // Limit to 5 suggestions
+          
+          // Get all active buses to check for already assigned conductors
+          const allBuses = await BusService.getAllBuses();
+          const activeBuses = allBuses.filter((bus: Bus) => 
+            bus.status === 'active' && 
+            // Exclude current bus if editing (don't restrict current conductor)
+            (!isEditing || bus._id !== initialData?._id)
+          );
+          
+          // Get IDs of conductors already assigned to active buses
+          const assignedConductorIds = activeBuses
+            .map((bus: Bus) => typeof bus.conductorId === 'string' ? bus.conductorId : bus.conductorId._id)
+            .filter(Boolean);
+          
+          // Filter out already assigned conductors
+          const availableSuggestions = suggestions.filter(user => 
+            !assignedConductorIds.includes(user._id)
+          );
+          
+          setConductorSuggestions(availableSuggestions.slice(0, 5)); // Limit to 5 suggestions
         } catch (error) {
           console.error('Error fetching conductor suggestions:', error);
           setConductorSuggestions([]);
@@ -152,7 +171,7 @@ export default function BusForm({
 
     const timeoutId = setTimeout(fetchConductorSuggestions, 300);
     return () => clearTimeout(timeoutId);
-  }, [conductorUsername]);
+  }, [conductorUsername, isEditing, initialData]);
 
   // Debounced username validation
   useEffect(() => {
@@ -200,8 +219,31 @@ export default function BusForm({
       try {
         const user = await UserService.getUserByUsername(conductorUsername);
         if (user && (user.role === 'conductor' || user.role === 'admin')) {
-          setConductorValidation({ isValid: true, message: 'Valid conductor', isLoading: false });
-          setFormData(prev => ({ ...prev, conductorId: user._id }));
+          // Check if conductor is already assigned to another active bus
+          const allBuses = await BusService.getAllBuses();
+          const activeBuses = allBuses.filter((bus: Bus) => 
+            bus.status === 'active' && 
+            // Exclude current bus if editing (allow current conductor to stay)
+            (!isEditing || bus._id !== initialData?._id)
+          );
+          
+          // Check if this conductor is already assigned to any active bus
+          const isAssigned = activeBuses.some((bus: Bus) => {
+            const conductorId = typeof bus.conductorId === 'string' ? bus.conductorId : bus.conductorId._id;
+            return conductorId === user._id;
+          });
+          
+          if (isAssigned) {
+            setConductorValidation({ 
+              isValid: false, 
+              message: 'This conductor is already assigned to another active bus', 
+              isLoading: false 
+            });
+            setFormData(prev => ({ ...prev, conductorId: '' }));
+          } else {
+            setConductorValidation({ isValid: true, message: 'Valid conductor', isLoading: false });
+            setFormData(prev => ({ ...prev, conductorId: user._id }));
+          }
         } else if (user) {
           setConductorValidation({ isValid: false, message: 'User must be a conductor', isLoading: false });
           setFormData(prev => ({ ...prev, conductorId: '' }));
@@ -217,7 +259,7 @@ export default function BusForm({
 
     const timeoutId = setTimeout(validateConductor, 500);
     return () => clearTimeout(timeoutId);
-  }, [conductorUsername]);
+  }, [conductorUsername, isEditing, initialData]);
 
   // Fetch route suggestions when typing
   useEffect(() => {
@@ -825,12 +867,29 @@ export default function BusForm({
                                       ? 'bg-green-100 text-green-800' 
                                       : 'bg-gray-100 text-gray-800'
                                   }`}>
-                                    {user.isActive ? 'Active' : 'Inactive'}
+                                    {user.isActive ? 'Available' : 'Inactive'}
                                   </span>
                                 </div>
                               </div>
                             </div>
                           ))}
+                        </div>
+                      )}
+                      
+                      {/* No available conductors message */}
+                      {showConductorSuggestions && conductorSuggestions.length === 0 && conductorUsername.trim().length >= 1 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-xl shadow-lg">
+                          <div className="px-4 py-3 text-center text-gray-500">
+                            <div className="flex items-center justify-center">
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              No available conductors found
+                            </div>
+                            <div className="text-xs mt-1">
+                              Matching conductors may already be assigned to other active buses
+                            </div>
+                          </div>
                         </div>
                       )}
                       
@@ -855,6 +914,9 @@ export default function BusForm({
                         {conductorValidation.message}
                       </p>
                     )}
+                    <p className="mt-1 text-xs text-gray-500">
+                      Conductors already assigned to active buses cannot be selected
+                    </p>
                   </div>
                 </div>
               </div>
