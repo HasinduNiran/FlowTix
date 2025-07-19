@@ -2,10 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { RouteService, Route, Section } from '@/services/route.service';
+import { RouteService, Route } from '@/services/route.service';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { DataTable } from '@/components/dashboard/DataTable';
 
 export default function RouteDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -13,15 +12,10 @@ export default function RouteDetailsPage({ params }: { params: Promise<{ id: str
   const id = resolvedParams.id;
   
   const [route, setRoute] = useState<Route | null>(null);
-  const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editedRoute, setEditedRoute] = useState<Partial<Route>>({});
-  const [showAddSectionModal, setShowAddSectionModal] = useState<boolean>(false);
-  const [availableSections, setAvailableSections] = useState<Section[]>([]);
-  const [selectedSection, setSelectedSection] = useState<string>('');
-  const [sectionOrder, setSectionOrder] = useState<number>(1);
 
   useEffect(() => {
     if (id) {
@@ -36,33 +30,12 @@ export default function RouteDetailsPage({ params }: { params: Promise<{ id: str
       const routeData = await RouteService.getRouteById(id);
       setRoute(routeData);
       setEditedRoute(routeData);
-      
-      // Fetch sections associated with this route
-      const routeSections = await RouteService.getRouteSections(id);
-      
-      // For each route section, fetch the section details
-      const sectionDetails = await Promise.all(
-        routeSections.map(async (rs) => {
-          return await RouteService.getSectionById(rs.section);
-        })
-      );
-      
-      setSections(sectionDetails);
       setError(null);
     } catch (err) {
       console.error('Failed to fetch route details:', err);
       setError('Failed to load route details. Please try again later.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchAllSections = async () => {
-    try {
-      const allSections = await RouteService.getAllSections();
-      setAvailableSections(allSections);
-    } catch (err) {
-      console.error('Failed to fetch sections:', err);
     }
   };
 
@@ -78,36 +51,10 @@ export default function RouteDetailsPage({ params }: { params: Promise<{ id: str
     }
   };
 
-  const handleAddSection = async () => {
-    if (!selectedSection) {
-      setError('Please select a section to add');
-      return;
-    }
-
-    try {
-      await RouteService.addSectionToRoute(id, selectedSection, sectionOrder);
-      setShowAddSectionModal(false);
-      setSelectedSection('');
-      setSectionOrder(1);
-      fetchRouteDetails(); // Refresh the route details
-    } catch (err) {
-      console.error('Failed to add section to route:', err);
-      setError('Failed to add section. Please try again.');
-    }
-  };
-
   const handleCancel = () => {
     setIsEditing(false);
     setEditedRoute(route || {});
   };
-
-  const sectionColumns = [
-    { header: 'Name', accessor: 'name' },
-    { header: 'Code', accessor: 'code' },
-    { header: 'Distance (km)', accessor: 'distance' },
-    { header: 'Fare', accessor: 'fare' },
-    { header: 'Status', accessor: 'isActive', cell: (isActive: boolean) => isActive ? 'Active' : 'Inactive' }
-  ];
 
   if (loading) {
     return (
@@ -277,61 +224,6 @@ export default function RouteDetailsPage({ params }: { params: Promise<{ id: str
           </div>
         )}
       </div>
-
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Route Sections</h2>
-          <Button onClick={() => setShowAddSectionModal(true)}>Add Section</Button>
-        </div>
-
-        <DataTable
-          columns={sectionColumns}
-          data={sections}
-          emptyMessage="No sections assigned to this route"
-        />
-      </div>
-
-      {/* Add Section Modal */}
-      {showAddSectionModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">Add Section to Route</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Select Section</label>
-                <select
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50"
-                  value={selectedSection}
-                  onChange={(e) => setSelectedSection(e.target.value)}
-                >
-                  <option value="">-- Select a section --</option>
-                  {availableSections.map((section) => (
-                    <option key={section._id} value={section._id}>
-                      {section.name} ({section.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Order</label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={sectionOrder}
-                  onChange={(e) => setSectionOrder(parseInt(e.target.value))}
-                />
-              </div>
-            </div>
-            
-            <div className="mt-6 flex justify-end space-x-3">
-              <Button variant="outline" onClick={() => setShowAddSectionModal(false)}>Cancel</Button>
-              <Button onClick={handleAddSection}>Add Section</Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 } 
