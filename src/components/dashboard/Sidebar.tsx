@@ -21,6 +21,7 @@ export default function Sidebar({ role }: SidebarProps) {
     { name: 'Routes', href: '/super-admin/routes', icon: '🗺️' },
     { name: 'Route Sections', href: '/super-admin/route-sections', icon: '🔗' },
     { name: 'Sections', href: '/super-admin/sections', icon: '🔄' },
+    { name: 'Trips', href: '/super-admin/trips', icon: '🚍' },
     { name: 'Tickets', href: '/super-admin/tickets', icon: '🎫' },
     { name: 'Reports', href: '/super-admin/reports', icon: '📝' },
     { name: 'Settings', href: '/super-admin/settings', icon: '⚙️' },

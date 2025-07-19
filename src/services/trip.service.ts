@@ -1,25 +1,49 @@
 import api from './api';
 
+export interface TripStopSection {
+  routeSectionId: string;
+  sectionName: string;
+  sectionNumber: number;
+}
+
 export interface Trip {
   _id: string;
-  tripNumber: string;
-  route: string;
-  bus: string;
-  conductor: string;
-  departureTime: Date;
-  arrivalTime?: Date;
-  status: 'scheduled' | 'in-progress' | 'completed' | 'cancelled';
-  availableSeats: number;
-  totalSeats: number;
+  busId: string | any; // Can be populated
+  routeId: string | any; // Can be populated
+  tripNumber: number;
+  direction: 'forward' | 'return';
+  startTime: Date | string;
+  endTime?: Date | string;
+  date: Date | string;
+  fromStopSection: TripStopSection;
+  toStopSection?: TripStopSection;
+  cashInHand: number;
+  totalFare: number;
+  passengerCount: number;
+  difference: number;
   createdAt: string;
   updatedAt: string;
 }
 
 export const TripService = {
-  async getAllTrips(filters?: { routeId?: string; status?: string; date?: string }): Promise<Trip[]> {
+  async getAllTrips(filters?: { busId?: string; routeId?: string; date?: string; page?: number; limit?: number; sort?: string }): Promise<Trip[]> {
     try {
-      const response = await api.get('/trips', { params: filters });
-      return response.data.data;
+      const params: any = {};
+      
+      if (filters?.date) {
+        params.startDate = filters.date;
+        params.endDate = filters.date;
+      }
+      if (filters?.busId) params.busId = filters.busId;
+      if (filters?.routeId) params.routeId = filters.routeId;
+      if (filters?.page) params.page = filters.page;
+      if (filters?.limit) params.limit = filters.limit;
+      if (filters?.sort) params.sort = filters.sort;
+
+      const response = await api.get('/trips', { params });
+      
+      // Backend returns { success: true, total, page, limit, totalPages, data: trips[] }
+      return response.data.data || [];
     } catch (error) {
       console.error('Error fetching trips:', error);
       throw error;
@@ -36,62 +60,44 @@ export const TripService = {
     }
   },
   
-  async createTrip(tripData: Omit<Trip, '_id' | 'createdAt' | 'updatedAt'>): Promise<Trip> {
+  async getActiveTripForBus(busId: string): Promise<Trip | null> {
     try {
-      const response = await api.post('/trips', tripData);
+      const response = await api.get(`/trips/active/bus/${busId}`);
       return response.data.data;
-    } catch (error) {
-      console.error('Error creating trip:', error);
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return null; // No active trip found
+      }
+      console.error(`Error fetching active trip for bus ${busId}:`, error);
       throw error;
     }
   },
   
-  async updateTrip(id: string, tripData: Partial<Omit<Trip, '_id' | 'createdAt' | 'updatedAt'>>): Promise<Trip> {
+  async startTrip(tripData: any): Promise<Trip> {
     try {
-      const response = await api.put(`/trips/${id}`, tripData);
+      const response = await api.post('/trips/start', tripData);
       return response.data.data;
     } catch (error) {
-      console.error(`Error updating trip with id ${id}:`, error);
+      console.error('Error starting trip:', error);
       throw error;
     }
   },
   
-  async startTrip(id: string): Promise<Trip> {
+  async endTrip(id: string, endData?: any): Promise<Trip> {
     try {
-      const response = await api.patch(`/trips/${id}/start`);
+      const response = await api.post(`/trips/end/${id}`, endData || {});
       return response.data.data;
     } catch (error) {
-      console.error(`Error starting trip with id ${id}:`, error);
+      console.error(`Error ending trip with id ${id}:`, error);
       throw error;
     }
   },
   
-  async completeTrip(id: string): Promise<Trip> {
+  async deleteTrip(id: string): Promise<void> {
     try {
-      const response = await api.patch(`/trips/${id}/complete`);
-      return response.data.data;
+      await api.delete(`/trips/${id}`);
     } catch (error) {
-      console.error(`Error completing trip with id ${id}:`, error);
-      throw error;
-    }
-  },
-  
-  async cancelTrip(id: string): Promise<Trip> {
-    try {
-      const response = await api.patch(`/trips/${id}/cancel`);
-      return response.data.data;
-    } catch (error) {
-      console.error(`Error cancelling trip with id ${id}:`, error);
-      throw error;
-    }
-  },
-  
-  async getAvailableSeats(tripId: string): Promise<{ seatNumber: string; isAvailable: boolean }[]> {
-    try {
-      const response = await api.get(`/trips/${tripId}/seats`);
-      return response.data.data;
-    } catch (error) {
-      console.error(`Error fetching available seats for trip ${tripId}:`, error);
+      console.error(`Error deleting trip with id ${id}:`, error);
       throw error;
     }
   }
