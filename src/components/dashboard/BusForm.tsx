@@ -597,14 +597,17 @@ export default function BusForm({
 
             {/* Form Actions */}
             <div className="mt-8 flex justify-end space-x-4 pt-6 border-t border-gray-200">
-              <Button
-                type="button"
-                onClick={handleCancel}
-                disabled={isSubmitting}
-                className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-medium transition-all duration-200"
-              >
-                Cancel
-              </Button>
+                <Button
+                  type="button"
+                  onClick={handleCancel}
+                  disabled={isSubmitting}
+                  className="px-8 py-3 bg-red-500 text-white hover:bg-red-600 rounded-xl font-medium transition-all duration-200 border-2 border-red-700 shadow-md hover:shadow-lg flex items-center"
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Cancel
+                </Button>
               <Button
                 type="submit"
                 disabled={isSubmitting}
