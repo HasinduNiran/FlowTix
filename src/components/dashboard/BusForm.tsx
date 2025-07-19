@@ -531,45 +531,14 @@ export default function BusForm({
                       </svg>
                       Bus Number *
                     </label>
-                    <div className="relative">
-                      <Input
-                        type="text"
-                        value={formData.busNumber}
-                        onChange={(e) => handleInputChange('busNumber', e.target.value)}
-                        placeholder="e.g., KP-5677"
-                        required
-                        maxLength={7}
-                        className={`bg-white border-2 rounded-xl px-4 py-3 pr-10 transition-all duration-200 ${
-                          busNumberValidation.isValid 
-                            ? 'border-green-300 focus:border-green-400' 
-                            : formData.busNumber && !busNumberValidation.isValid 
-                            ? 'border-red-300 focus:border-red-400'
-                            : 'border-blue-200 focus:border-blue-400'
-                        }`}
-                      />
-                      
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                        {busNumberValidation.isValid ? (
-                          <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        ) : formData.busNumber && !busNumberValidation.isValid ? (
-                          <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        ) : null}
-                      </div>
-                    </div>
-                    {formData.busNumber && busNumberValidation.message && (
-                      <p className={`mt-1 text-xs ${
-                        busNumberValidation.isValid ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {busNumberValidation.message}
-                      </p>
-                    )}
-                    <p className="mt-1 text-xs text-gray-500">
-                      Format: Two uppercase letters, dash, four digits (e.g., KP-5677)
-                    </p>
+                    <Input
+                      type="text"
+                      value={formData.busNumber}
+                      onChange={(e) => handleInputChange('busNumber', e.target.value)}
+                      placeholder="e.g., NB 1234"
+                      required
+                      className="bg-white border-2 border-blue-200 focus:border-blue-400 rounded-xl px-4 py-3 transition-all duration-200"
+                    />
                   </div>
 
                   <div>
