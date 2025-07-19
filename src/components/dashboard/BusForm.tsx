@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Bus } from '@/services/bus.service';
+import { Bus, User as BusUser } from '@/services/bus.service';
+import { UserService, UserLookup } from '@/services/user.service';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useRouter } from 'next/navigation';
@@ -31,6 +32,19 @@ export default function BusForm({
     notes: ''
   });
 
+  const [ownerUsername, setOwnerUsername] = useState('');
+  const [conductorUsername, setConductorUsername] = useState('');
+  const [ownerValidation, setOwnerValidation] = useState<{
+    isValid: boolean;
+    message: string;
+    isLoading: boolean;
+  }>({ isValid: false, message: '', isLoading: false });
+  const [conductorValidation, setConductorValidation] = useState<{
+    isValid: boolean;
+    message: string;
+    isLoading: boolean;
+  }>({ isValid: false, message: '', isLoading: false });
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -50,8 +64,83 @@ export default function BusForm({
         status: initialData.status,
         notes: initialData.notes || ''
       });
+
+      // Set usernames for display when editing
+      if (typeof initialData.ownerId === 'object' && initialData.ownerId.username) {
+        setOwnerUsername(initialData.ownerId.username);
+        setOwnerValidation({ isValid: true, message: 'Valid owner', isLoading: false });
+      }
+      if (typeof initialData.conductorId === 'object' && initialData.conductorId.username) {
+        setConductorUsername(initialData.conductorId.username);
+        setConductorValidation({ isValid: true, message: 'Valid conductor', isLoading: false });
+      }
     }
   }, [initialData, isEditing]);
+
+  // Debounced username validation
+  useEffect(() => {
+    const validateOwner = async () => {
+      if (!ownerUsername.trim()) {
+        setOwnerValidation({ isValid: false, message: '', isLoading: false });
+        setFormData(prev => ({ ...prev, ownerId: '' }));
+        return;
+      }
+
+      setOwnerValidation({ isValid: false, message: '', isLoading: true });
+
+      try {
+        const user = await UserService.getUserByUsername(ownerUsername);
+        if (user && (user.role === 'owner' || user.role === 'admin')) {
+          setOwnerValidation({ isValid: true, message: 'Valid owner', isLoading: false });
+          setFormData(prev => ({ ...prev, ownerId: user._id }));
+        } else if (user) {
+          setOwnerValidation({ isValid: false, message: 'User must be an owner', isLoading: false });
+          setFormData(prev => ({ ...prev, ownerId: '' }));
+        } else {
+          setOwnerValidation({ isValid: false, message: 'User not found', isLoading: false });
+          setFormData(prev => ({ ...prev, ownerId: '' }));
+        }
+      } catch (error) {
+        setOwnerValidation({ isValid: false, message: 'Error validating user', isLoading: false });
+        setFormData(prev => ({ ...prev, ownerId: '' }));
+      }
+    };
+
+    const timeoutId = setTimeout(validateOwner, 500);
+    return () => clearTimeout(timeoutId);
+  }, [ownerUsername]);
+
+  useEffect(() => {
+    const validateConductor = async () => {
+      if (!conductorUsername.trim()) {
+        setConductorValidation({ isValid: false, message: '', isLoading: false });
+        setFormData(prev => ({ ...prev, conductorId: '' }));
+        return;
+      }
+
+      setConductorValidation({ isValid: false, message: '', isLoading: true });
+
+      try {
+        const user = await UserService.getUserByUsername(conductorUsername);
+        if (user && (user.role === 'conductor' || user.role === 'admin')) {
+          setConductorValidation({ isValid: true, message: 'Valid conductor', isLoading: false });
+          setFormData(prev => ({ ...prev, conductorId: user._id }));
+        } else if (user) {
+          setConductorValidation({ isValid: false, message: 'User must be a conductor', isLoading: false });
+          setFormData(prev => ({ ...prev, conductorId: '' }));
+        } else {
+          setConductorValidation({ isValid: false, message: 'User not found', isLoading: false });
+          setFormData(prev => ({ ...prev, conductorId: '' }));
+        }
+      } catch (error) {
+        setConductorValidation({ isValid: false, message: 'Error validating user', isLoading: false });
+        setFormData(prev => ({ ...prev, conductorId: '' }));
+      }
+    };
+
+    const timeoutId = setTimeout(validateConductor, 500);
+    return () => clearTimeout(timeoutId);
+  }, [conductorUsername]);
 
   const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({
@@ -65,6 +154,19 @@ export default function BusForm({
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
+
+    // Validate that owner and conductor are properly set
+    if (!ownerValidation.isValid || !formData.ownerId) {
+      setError('Please enter a valid owner username');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!conductorValidation.isValid || !formData.conductorId) {
+      setError('Please enter a valid conductor username');
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       await onSubmit(formData);
@@ -269,16 +371,49 @@ export default function BusForm({
                       <svg className="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
                       </svg>
-                      Owner ID *
+                      Owner Username *
                     </label>
-                    <Input
-                      type="text"
-                      value={formData.ownerId}
-                      onChange={(e) => handleInputChange('ownerId', e.target.value)}
-                      placeholder="e.g., OWN001"
-                      required
-                      className="bg-white border-2 border-green-200 focus:border-green-400 rounded-xl px-4 py-3 transition-all duration-200"
-                    />
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        value={ownerUsername}
+                        onChange={(e) => {
+                          setOwnerUsername(e.target.value);
+                          setError(null);
+                        }}
+                        placeholder="e.g., john_owner"
+                        required
+                        className={`bg-white border-2 rounded-xl px-4 py-3 pr-10 transition-all duration-200 ${
+                          ownerValidation.isLoading 
+                            ? 'border-yellow-300 focus:border-yellow-400' 
+                            : ownerValidation.isValid 
+                            ? 'border-green-300 focus:border-green-400' 
+                            : ownerUsername && !ownerValidation.isValid 
+                            ? 'border-red-300 focus:border-red-400'
+                            : 'border-green-200 focus:border-green-400'
+                        }`}
+                      />
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                        {ownerValidation.isLoading ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-yellow-400 border-t-transparent"></div>
+                        ) : ownerValidation.isValid ? (
+                          <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : ownerUsername && !ownerValidation.isValid ? (
+                          <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        ) : null}
+                      </div>
+                    </div>
+                    {ownerUsername && ownerValidation.message && (
+                      <p className={`mt-1 text-xs ${
+                        ownerValidation.isValid ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {ownerValidation.message}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -286,16 +421,49 @@ export default function BusForm({
                       <svg className="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
-                      Conductor ID *
+                      Conductor Username *
                     </label>
-                    <Input
-                      type="text"
-                      value={formData.conductorId}
-                      onChange={(e) => handleInputChange('conductorId', e.target.value)}
-                      placeholder="e.g., CON001"
-                      required
-                      className="bg-white border-2 border-green-200 focus:border-green-400 rounded-xl px-4 py-3 transition-all duration-200"
-                    />
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        value={conductorUsername}
+                        onChange={(e) => {
+                          setConductorUsername(e.target.value);
+                          setError(null);
+                        }}
+                        placeholder="e.g., jane_conductor"
+                        required
+                        className={`bg-white border-2 rounded-xl px-4 py-3 pr-10 transition-all duration-200 ${
+                          conductorValidation.isLoading 
+                            ? 'border-yellow-300 focus:border-yellow-400' 
+                            : conductorValidation.isValid 
+                            ? 'border-green-300 focus:border-green-400' 
+                            : conductorUsername && !conductorValidation.isValid 
+                            ? 'border-red-300 focus:border-red-400'
+                            : 'border-green-200 focus:border-green-400'
+                        }`}
+                      />
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                        {conductorValidation.isLoading ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-yellow-400 border-t-transparent"></div>
+                        ) : conductorValidation.isValid ? (
+                          <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : conductorUsername && !conductorValidation.isValid ? (
+                          <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        ) : null}
+                      </div>
+                    </div>
+                    {conductorUsername && conductorValidation.message && (
+                      <p className={`mt-1 text-xs ${
+                        conductorValidation.isValid ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {conductorValidation.message}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
