@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { SectionService, Section, SectionCategory } from '@/services/section.service';
 import { Button } from '@/components/ui/Button';
@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/Input';
 
 export default function SectionDetailsPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { id } = params;
+  const resolvedParams = React.use(params);
+  const id = resolvedParams.id;
   
   const [section, setSection] = useState<Section | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
