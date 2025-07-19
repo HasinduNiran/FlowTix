@@ -4,12 +4,22 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { BusService, Bus, User, Route } from '@/services/bus.service';
 import { Button } from '@/components/ui/Button';
+import { Toast } from '@/components/ui/Toast';
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 import { useAuth } from '@/context/AuthContext';
 
 export default function BusDetailPage() {
   const [bus, setBus] = useState<Bus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [toastConfig, setToastConfig] = useState({
+    type: 'success' as 'success' | 'error',
+    title: '',
+    message: ''
+  });
   const router = useRouter();
   const params = useParams();
   const busId = params.id as string;
@@ -69,15 +79,39 @@ export default function BusDetailPage() {
   const handleDeleteBus = async () => {
     if (!bus) return;
     
-    if (window.confirm('Are you sure you want to delete this bus?')) {
-      try {
-        await BusService.deleteBus(bus._id);
+    setIsDeleting(true);
+    try {
+      await BusService.deleteBus(bus._id);
+      
+      // Show success toast
+      setToastConfig({
+        type: 'success',
+        title: 'Bus Deleted Successfully!',
+        message: `${bus.busName} (${bus.busNumber}) has been permanently removed from the system.`
+      });
+      setShowToast(true);
+      setShowConfirmModal(false);
+      
+      // Navigate after a short delay to show the toast
+      setTimeout(() => {
         router.push('/super-admin/buses');
-      } catch (err) {
-        setError('Failed to delete bus. Please try again.');
-        console.error(err);
-      }
+      }, 2000);
+    } catch (err) {
+      setToastConfig({
+        type: 'error',
+        title: 'Delete Failed',
+        message: 'Failed to delete bus. Please try again or contact support if the problem persists.'
+      });
+      setShowToast(true);
+      setShowConfirmModal(false);
+      console.error(err);
+    } finally {
+      setIsDeleting(false);
     }
+  };
+
+  const handleDeleteClick = () => {
+    setShowConfirmModal(true);
   };
 
   const handleBackClick = () => {
@@ -186,7 +220,7 @@ export default function BusDetailPage() {
                   Edit Bus
                 </Button>
                 <Button 
-                  onClick={handleDeleteBus} 
+                  onClick={handleDeleteClick} 
                   className="bg-red-600 hover:bg-red-700 shadow-md hover:shadow-lg transition-all duration-200"
                 >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -378,6 +412,29 @@ export default function BusDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={handleDeleteBus}
+        title="Delete Bus Permanently?"
+        message={`Are you absolutely sure you want to delete "${bus?.busName}" (${bus?.busNumber})? This action cannot be undone and will permanently remove all associated data.`}
+        confirmText="Yes, Delete Bus"
+        cancelText="Cancel"
+        type="danger"
+        isLoading={isDeleting}
+      />
+
+      {/* Toast Notification */}
+      <Toast
+        isOpen={showToast}
+        onClose={() => setShowToast(false)}
+        title={toastConfig.title}
+        message={toastConfig.message}
+        type={toastConfig.type}
+        duration={toastConfig.type === 'success' ? 3000 : 5000}
+      />
     </div>
   );
 } 
