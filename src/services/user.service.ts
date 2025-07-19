@@ -29,5 +29,30 @@ export const UserService = {
       console.error(`Error fetching users by role ${role}:`, error);
       throw error;
     }
+  },
+
+  async searchUsersByRole(role: 'owner' | 'conductor', searchTerm: string = ''): Promise<UserLookup[]> {
+    try {
+      // Use the new backend search endpoint for better performance
+      const response = await api.get(`/users/search-by-role?role=${role}&username=${encodeURIComponent(searchTerm)}`);
+      return response.data.data;
+    } catch (error) {
+      console.error(`Error searching users by role ${role}:`, error);
+      // Fallback to the old method if the new endpoint is not available
+      try {
+        const users = await this.getUsersByRole(role);
+        if (!searchTerm.trim()) {
+          return users;
+        }
+        
+        // Filter users by username containing the search term
+        return users.filter(user => 
+          user.username.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+      } catch (fallbackError) {
+        console.error(`Fallback search also failed:`, fallbackError);
+        throw error;
+      }
+    }
   }
 };
