@@ -156,195 +156,288 @@ export default function SectionsPage() {
 
   // Categories for tabs
   const categoryTabs = [
-    { id: 'normal', label: 'NORMAL', icon: '🚍' },
-    { id: 'semi_luxury', label: 'SEMI-LUXURY', icon: '🚌' },
-    { id: 'luxury', label: 'LUXURY', icon: '🚐' },
-    { id: 'high_luxury', label: 'SUPER LUXURY', icon: '🚘' }
+    { 
+      id: 'normal', 
+      label: 'NORMAL', 
+      icon: (
+        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M4 16c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V6h12v5z"/>
+        </svg>
+      )
+    },
+    { 
+      id: 'semi_luxury', 
+      label: 'SEMI-LUXURY', 
+      icon: (
+        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/>
+          <circle cx="9" cy="9" r="0.5"/>
+          <circle cx="12" cy="9" r="0.5"/>
+          <circle cx="15" cy="9" r="0.5"/>
+        </svg>
+      )
+    },
+    { 
+      id: 'luxury', 
+      label: 'LUXURY', 
+      icon: (
+        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M19 7h-3V6a2 2 0 0 0-2-2H10a2 2 0 0 0-2 2v1H5a3 3 0 0 0-3 3v6a2 2 0 0 0 2 2h1v1a1 1 0 0 0 2 0v-1h10v1a1 1 0 0 0 2 0v-1h1a2 2 0 0 0 2-2v-6a3 3 0 0 0-3-3zM10 6h4v1h-4V6zm-4 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm12 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
+          <rect x="9" y="8.5" width="6" height="1" rx="0.5"/>
+          <rect x="8" y="10" width="8" height="0.5" rx="0.25"/>
+        </svg>
+      )
+    },
+    { 
+      id: 'high_luxury', 
+      label: 'SUPER LUXURY', 
+      icon: (
+        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2l1.5 3h3.5l-2.5 2.5L16 11l-4-2.5L8 11l1.5-3.5L7 5h3.5L12 2z"/>
+          <path d="M19 9h-2V7a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v2H5a3 3 0 0 0-3 3v5a2 2 0 0 0 2 2h1v1a1 1 0 0 0 2 0v-1h10v1a1 1 0 0 0 2 0v-1h1a2 2 0 0 0 2-2v-5a3 3 0 0 0-3-3zM9 7h6v2H9V7zm-3 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm12 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
+        </svg>
+      )
+    }
   ];
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Section Management</h1>
-          <p className="text-gray-600 text-lg">
-            Manage bus sections by category. Each category has its own fare structure.
-          </p>
-        </div>
-
-        {/* Category Tabs */}
-        <div className="flex overflow-x-auto mb-8 border-b">
-          {categoryTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setSelectedCategory(tab.id)}
-              className={`flex flex-col items-center px-6 py-3 text-lg font-medium whitespace-nowrap ${
-                selectedCategory === tab.id
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-blue-500'
-              }`}
-            >
-              <div className="text-2xl mb-1">{tab.icon}</div>
-              <div>{tab.label}</div>
-              <div className="text-sm mt-1 font-normal">
-                {getSectionCountByCategory(tab.id)} sections
-              </div>
-            </button>
-          ))}
-        </div>
-
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <h2 className="text-2xl font-bold text-gray-800">
-            {formatCategory(selectedCategory)} Sections
-          </h2>
-          <div className="flex items-center gap-4 w-full md:w-auto">
-            <div className="relative flex-grow md:w-64">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <Input
-                type="text"
-                placeholder="Search sections..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-full text-base"
-              />
-            </div>
-            <Button 
-              onClick={() => {
-                setNewSection({...newSection, category: selectedCategory as SectionCategory});
-                setShowAddModal(true);
-              }}
-              className="bg-blue-600 hover:bg-blue-700 text-base flex items-center gap-2 whitespace-nowrap"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-              </svg>
-              Add Section
-            </Button>
-          </div>
-        </div>
-
-        {error && (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded">
-            <div className="flex">
-              <div className="py-1">
-                <svg className="h-6 w-6 text-red-500 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
+      <div className="container mx-auto p-6 max-w-7xl">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+          {/* Header Section */}
+          <div className="bg-white border-b border-gray-200 p-6">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="font-bold">Error</p>
-                <p>{error}</p>
+                <h1 className="text-2xl font-bold text-gray-800 mb-1">Section Management</h1>
+                <p className="text-gray-600 text-sm">
+                  Configure fare structures for different bus categories
+                </p>
+              </div>
+              <div className="text-3xl text-gray-300">
+                🚌
               </div>
             </div>
           </div>
-        )}
 
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          {/* Category Tabs */}
+          <div className="bg-white border-b border-gray-200">
+            <div className="flex overflow-x-auto">
+              {categoryTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setSelectedCategory(tab.id)}
+                  className={`flex flex-col items-center px-8 py-4 text-base font-medium whitespace-nowrap transition-all duration-200 relative ${
+                    selectedCategory === tab.id
+                      ? 'text-blue-600 bg-blue-50 border-b-3 border-blue-600'
+                      : 'text-gray-600 hover:text-blue-500 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="mb-2">{tab.icon}</div>
+                  <div className="font-semibold">{tab.label}</div>
+                  <div className={`text-xs mt-1 px-2 py-1 rounded-full ${
+                    selectedCategory === tab.id 
+                      ? 'bg-blue-100 text-blue-700' 
+                      : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {getSectionCountByCategory(tab.id)} sections
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
-        ) : (
-          <>
-            <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-500 rounded">
-              <p className="text-blue-600 text-base">
-                Showing {filteredSections.length} {formatCategory(selectedCategory)} {filteredSections.length === 1 ? 'section' : 'sections'}
-              </p>
+
+          {/* Content Area */}
+          <div className="p-8">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
+              <div>
+                <h2 className="text-3xl font-bold text-gray-800 mb-2">
+                  {formatCategory(selectedCategory)} Sections
+                </h2>
+                <p className="text-gray-600">
+                  Manage fare pricing for {formatCategory(selectedCategory).toLowerCase()} category buses
+                </p>
+              </div>
+              
+              <div className="flex items-center gap-4 w-full lg:w-auto">
+                <div className="relative flex-grow lg:w-80">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <Input
+                    type="text"
+                    placeholder="Search by section number or description..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-12 pr-4 py-3 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  />
+                </div>
+                <Button 
+                  onClick={() => {
+                    setNewSection({...newSection, category: selectedCategory as SectionCategory});
+                    setShowAddModal(true);
+                  }}
+                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-3 whitespace-nowrap"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                  Add Section
+                </Button>
+              </div>
             </div>
 
-            <DataTable
-              columns={columns}
-              data={filteredSections}
-              emptyMessage={`No ${formatCategory(selectedCategory)} sections found`}
-            />
-          </>
-        )}
+            {error && (
+              <div className="bg-red-50 border-l-4 border-red-400 text-red-800 p-6 mb-8 rounded-r-lg shadow-sm">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <svg className="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <div className="ml-4">
+                    <h3 className="font-bold text-lg">Error Occurred</h3>
+                    <p className="mt-1">{error}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {loading ? (
+              <div className="flex flex-col justify-center items-center h-80">
+                <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mb-4"></div>
+                <p className="text-gray-600 text-lg">Loading sections...</p>
+              </div>
+            ) : (
+              <>
+                <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 rounded-full">
+                      <svg className="h-5 w-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <p className="text-blue-800 font-medium text-lg">
+                      Showing {filteredSections.length} {formatCategory(selectedCategory).toLowerCase()} {filteredSections.length === 1 ? 'section' : 'sections'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  <DataTable
+                    columns={columns}
+                    data={filteredSections}
+                    emptyMessage={`No ${formatCategory(selectedCategory).toLowerCase()} sections found. Create one to get started.`}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Add Section Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={(e) => {
-          if (e.target === e.currentTarget) setShowAddModal(false);
-        }}>
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-800">Add New {formatCategory(selectedCategory)} Section</h2>
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.3)' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAddModal(false);
+          }}
+        >
+          <div 
+            className="bg-white rounded-xl shadow-xl w-full max-w-lg transform transition-all duration-300 ease-out scale-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 pb-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">Create New Section</h2>
+                <p className="text-sm text-gray-500 mt-1">{formatCategory(selectedCategory)} Category</p>
+              </div>
               <button 
                 onClick={() => setShowAddModal(false)}
-                className="text-gray-500 hover:text-gray-700"
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200 group"
               >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-5 w-5 text-gray-400 group-hover:text-gray-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
             
-            <div className="space-y-4">
-              <div>
-                <label className="block text-base font-medium text-gray-700">Section Number</label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={newSection.sectionNumber}
-                  onChange={(e) => setNewSection({...newSection, sectionNumber: parseInt(e.target.value)})}
-                  className="w-full text-base"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-base font-medium text-gray-700">Fare (Rs.)</label>
-                <Input
-                  type="number"
-                  min={0.01}
-                  step={0.01}
-                  value={newSection.fare}
-                  onChange={(e) => setNewSection({...newSection, fare: parseFloat(e.target.value)})}
-                  className="w-full text-base"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-base font-medium text-gray-700">Description</label>
-                <textarea
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 text-base"
-                  value={newSection.description}
-                  onChange={(e) => setNewSection({...newSection, description: e.target.value})}
-                  rows={3}
-                />
-              </div>
-              
-              <div>
-                <label className="block text-base font-medium text-gray-700">Status</label>
-                <select
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50 text-base"
-                  value={newSection.isActive ? 'true' : 'false'}
-                  onChange={(e) => setNewSection({...newSection, isActive: e.target.value === 'true'})}
-                >
-                  <option value="true">Active</option>
-                  <option value="false">Inactive</option>
-                </select>
+            {/* Form Content */}
+            <div className="p-6">
+              <div className="space-y-5">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Section Number</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={newSection.sectionNumber || ''}
+                      onChange={(e) => setNewSection({...newSection, sectionNumber: parseInt(e.target.value) || 0})}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="e.g., 1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Fare (Rs.)</label>
+                    <Input
+                      type="number"
+                      min={0.01}
+                      step={0.01}
+                      value={newSection.fare || ''}
+                      onChange={(e) => setNewSection({...newSection, fare: parseFloat(e.target.value) || 0})}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                  <textarea
+                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+                    value={newSection.description}
+                    onChange={(e) => setNewSection({...newSection, description: e.target.value})}
+                    rows={3}
+                    placeholder="Enter section description..."
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
+                  <select
+                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
+                    value={newSection.isActive ? 'true' : 'false'}
+                    onChange={(e) => setNewSection({...newSection, isActive: e.target.value === 'true'})}
+                  >
+                    <option value="true">✅ Active</option>
+                    <option value="false">❌ Inactive</option>
+                  </select>
+                </div>
               </div>
             </div>
             
-            <div className="mt-6 flex justify-end space-x-3">
+            {/* Footer */}
+            <div className="flex justify-end gap-3 p-6 pt-4 border-t border-gray-100 bg-gray-50 rounded-b-xl">
               <Button 
                 variant="outline" 
                 onClick={() => setShowAddModal(false)}
-                className="border-gray-300 text-gray-700 text-base"
+                className="px-6 py-2.5 border-2 border-gray-300 text-gray-700 hover:bg-gray-100 hover:border-gray-400 rounded-lg font-medium transition-all"
               >
                 Cancel
               </Button>
               <Button 
                 onClick={handleAddSection}
-                className="bg-blue-600 hover:bg-blue-700 text-base flex items-center gap-2"
+                className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
                 </svg>
-                Add Section
+                Create Section
               </Button>
             </div>
           </div>
