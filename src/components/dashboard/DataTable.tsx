@@ -4,7 +4,8 @@ import { useState } from 'react';
 
 interface Column<T> {
   header: string;
-  accessor: keyof T | ((item: T) => React.ReactNode);
+  accessor: keyof T | string;
+  cell?: (value: any) => React.ReactNode;
   className?: string;
 }
 
@@ -14,10 +15,10 @@ interface DataTableProps<T> {
   title?: string;
   emptyMessage?: string;
   onRowClick?: (item: T) => void;
-  keyExtractor: (item: T) => string;
+  keyExtractor?: (item: T) => string;
 }
 
-export default function DataTable<T>({
+export function DataTable<T>({
   columns,
   data,
   title,
@@ -58,6 +59,25 @@ export default function DataTable<T>({
     return 0;
   });
 
+  // Default key extractor uses index if not provided
+  const getKey = (item: T, index: number) => {
+    if (keyExtractor) {
+      return keyExtractor(item);
+    }
+    
+    // Try to use _id or id if available
+    if ('_id' in item) {
+      return (item as any)._id;
+    }
+    
+    if ('id' in item) {
+      return (item as any).id;
+    }
+    
+    // Fallback to index
+    return index.toString();
+  };
+
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
       {title && (
@@ -78,7 +98,7 @@ export default function DataTable<T>({
                   } ${column.className || ''}`}
                   onClick={() => {
                     if (typeof column.accessor === 'string') {
-                      handleSort(column.accessor);
+                      handleSort(column.accessor as keyof T);
                     }
                   }}
                 >
@@ -96,22 +116,25 @@ export default function DataTable<T>({
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {sortedData.length > 0 ? (
-              sortedData.map((item) => (
+              sortedData.map((item, index) => (
                 <tr
-                  key={keyExtractor(item)}
+                  key={getKey(item, index)}
                   className={onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''}
                   onClick={() => onRowClick && onRowClick(item)}
                 >
-                  {columns.map((column, columnIndex) => (
-                    <td
-                      key={columnIndex}
-                      className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${column.className || ''}`}
-                    >
-                      {typeof column.accessor === 'function'
-                        ? column.accessor(item)
-                        : item[column.accessor] as React.ReactNode}
-                    </td>
-                  ))}
+                  {columns.map((column, columnIndex) => {
+                    const accessor = column.accessor as string;
+                    const value = item[accessor as keyof T];
+                    
+                    return (
+                      <td
+                        key={columnIndex}
+                        className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${column.className || ''}`}
+                      >
+                        {column.cell ? column.cell(value) : value as React.ReactNode}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))
             ) : (
@@ -129,4 +152,7 @@ export default function DataTable<T>({
       </div>
     </div>
   );
-} 
+}
+
+// For backward compatibility
+export default DataTable; 
