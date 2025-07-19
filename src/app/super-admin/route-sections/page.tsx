@@ -32,12 +32,19 @@ function RouteSectionsManager() {
     fetchInitialData();
   }, []);
 
+  // Debug logging
+  useEffect(() => {
+    console.log('Current filterRoute:', filterRoute);
+    console.log('Total routeSections:', routeSections.length);
+  }, [filterRoute, routeSections]);
+
   const fetchInitialData = async () => {
     try {
       setLoading(true);
       
-      console.log('Fetching initial data (routes and stops only)...');
+      console.log('Fetching initial data...');
       
+      // Only fetch routes and stops initially, not route sections
       const [routesData, stopsData] = await Promise.all([
         RouteService.getAllRoutes(),
         StopService.getAllStops()
@@ -48,11 +55,28 @@ function RouteSectionsManager() {
 
       setRoutes(routesData);
       setStops(stopsData);
-      setRouteSections([]); // Don't load route sections by default
+      setRouteSections([]); // Start with empty route sections - user must select a route
     } catch (error) {
       console.error('Error fetching initial data:', error);
       setRoutes([]);
       setStops([]);
+      setRouteSections([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAllRouteSections = async () => {
+    try {
+      setLoading(true);
+      console.log('Fetching all route sections...');
+      
+      const routeSectionsData = await RouteSectionService.getAllRouteSections();
+      console.log('All fetched route sections:', routeSectionsData);
+      
+      setRouteSections(routeSectionsData);
+    } catch (error) {
+      console.error('Error fetching all route sections:', error);
       setRouteSections([]);
     } finally {
       setLoading(false);
@@ -65,11 +89,10 @@ function RouteSectionsManager() {
       console.log('Fetching route sections for route:', routeId);
       
       const routeSectionsData = await RouteSectionService.getAllRouteSections();
-      // Filter route sections by selected route
-      const filteredSections = routeSectionsData.filter(rs => rs.routeId._id === routeId);
+      console.log('All fetched route sections:', routeSectionsData);
       
-      console.log('Fetched route sections:', filteredSections);
-      setRouteSections(filteredSections);
+      // Always set all route sections - filtering will be handled by the filter logic
+      setRouteSections(routeSectionsData);
     } catch (error) {
       console.error('Error fetching route sections:', error);
       setRouteSections([]);
@@ -87,10 +110,14 @@ function RouteSectionsManager() {
         await RouteSectionService.createRouteSection(formData);
       }
       
-      // Refresh route sections if a route is selected
-      if (filterRoute) {
+      // Refresh data based on current filter state
+      if (filterRoute === 'all') {
+        await fetchAllRouteSections();
+      } else if (filterRoute && filterRoute !== '') {
         await fetchRouteSections(filterRoute);
       }
+      // If filterRoute is empty, don't fetch anything - user must select a route
+      
       setShowModal(false);
       resetForm();
     } catch (error) {
@@ -116,10 +143,14 @@ function RouteSectionsManager() {
     if (window.confirm('Are you sure you want to delete this route section?')) {
       try {
         await RouteSectionService.deleteRouteSection(id);
-        // Refresh route sections if a route is selected
-        if (filterRoute) {
+        
+        // Refresh data based on current filter state
+        if (filterRoute === 'all') {
+          await fetchAllRouteSections();
+        } else if (filterRoute && filterRoute !== '') {
           await fetchRouteSections(filterRoute);
         }
+        // If filterRoute is empty, don't fetch anything - user must select a route
       } catch (error) {
         console.error('Error deleting route section:', error);
         alert('Error deleting route section. Please try again.');
@@ -145,15 +176,22 @@ function RouteSectionsManager() {
         rs.stopId.stopName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         rs.category.toLowerCase().includes(searchTerm.toLowerCase());
       
-      return matchesSearch;
+      // If filterRoute is empty (Select a Route), show nothing
+      // If filterRoute is 'all', show all route sections
+      // Otherwise, filter by specific route ID
+      const matchesRoute = filterRoute === '' ? false : 
+                          filterRoute === 'all' ? true : 
+                          rs.routeId._id === filterRoute;
+      
+      return matchesSearch && matchesRoute;
     })
     .sort((a, b) => {
       let aValue, bValue;
       
       switch (sortBy) {
         case 'route':
-          aValue = a.routeId.routeName;
-          bValue = b.routeId.routeName;
+          aValue = a.routeId.routeName || '';
+          bValue = b.routeId.routeName || '';
           break;
         case 'order':
           aValue = a.order;
@@ -187,193 +225,359 @@ function RouteSectionsManager() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div className="flex items-center space-x-4">
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">🔍</span>
-            <input
-              type="text"
-              placeholder="Search stops or categories..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              disabled={!filterRoute}
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-400"
-            />
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
+      <div className="container mx-auto p-6 max-w-7xl">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+          {/* Header Section */}
+          <div className="bg-white border-b border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-800 mb-1">Route Sections Management</h1>
+                <p className="text-gray-600 text-sm">
+                  Manage route sections, assign stops to routes, and configure fare structures
+                </p>
+              </div>
+              <div className="text-3xl text-gray-300">
+                🚌
+              </div>
+            </div>
           </div>
-          
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">🔽</span>
-            <select
-              value={filterRoute}
-              onChange={(e) => {
-                setFilterRoute(e.target.value);
-                if (e.target.value) {
-                  fetchRouteSections(e.target.value);
-                } else {
-                  setRouteSections([]);
-                }
-              }}
-              className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
-            >
-              <option value="">Select a Route</option>
-              {routes.map((route) => (
-                <option key={route._id} value={route._id}>
-                  {route.code} - {route.name} ({route.startLocation} → {route.endLocation})
-                </option>
-              ))}
-            </select>
-            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">▼</span>
-          </div>
-        </div>
 
-        <button
-          onClick={() => {
-            resetForm();
-            setShowModal(true);
-          }}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2"
-        >
-          <span className="text-lg">➕</span>
-          <span>Add Route Section</span>
-        </button>
-      </div>
+          {/* Content Area */}
+          <div className="p-8">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
+              <div>
+                <h2 className="text-3xl font-bold text-gray-800 mb-2">
+                  Route Sections
+                </h2>
+                <p className="text-gray-600">
+                  View all route sections or filter by specific route
+                </p>
+              </div>
+              
+              <div className="flex items-center gap-4 w-full lg:w-auto">
+                <div className="relative flex-grow lg:w-80">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search stops or categories..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-12 pr-4 py-3 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  />
+                </div>
+                
+                <div className="relative flex-grow lg:w-80">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <select
+                    value={filterRoute}
+                    onChange={(e) => {
+                      const selectedRoute = e.target.value;
+                      console.log('Route filter changed to:', selectedRoute);
+                      setFilterRoute(selectedRoute);
+                      
+                      if (selectedRoute === '') {
+                        // "Select a Route" - clear route sections
+                        console.log('Clearing route sections - user must select a route');
+                        setRouteSections([]);
+                      } else if (selectedRoute === 'all') {
+                        // "All Routes" selected - fetch all route sections
+                        console.log('Fetching all route sections');
+                        fetchAllRouteSections();
+                      } else {
+                        // Specific route selected - fetch sections for that route only
+                        console.log('Fetching sections for specific route:', selectedRoute);
+                        fetchRouteSections(selectedRoute);
+                      }
+                    }}
+                    className="pl-12 pr-4 py-3 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white appearance-none"
+                  >
+                    <option value="">Select a Route</option>
+                    <option value="all">All Routes</option>
+                    {routes.map((route) => (
+                      <option key={route._id} value={route._id}>
+                        {route.code} - {route.name} ({route.startLocation} → {route.endLocation})
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-      {/* Sort Controls - Only show when route is selected */}
-      {filterRoute && routeSections.length > 0 && (
-        <div className="flex items-center space-x-4 text-sm">
-          <span className="text-gray-600">Sort by:</span>
-          {['order', 'fare', 'createdAt'].map((field) => (
-            <button
-              key={field}
-              onClick={() => {
-                if (sortBy === field) {
-                  setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                } else {
-                  setSortBy(field as typeof sortBy);
-                  setSortOrder('asc');
-                }
-              }}
-              className={`px-3 py-1 rounded ${
-                sortBy === field
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {field === 'createdAt' ? 'Created' : field.charAt(0).toUpperCase() + field.slice(1)}
-              {sortBy === field && (
-                <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
+                <button
+                  onClick={() => {
+                    resetForm();
+                    setShowModal(true);
+                  }}
+                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-3 whitespace-nowrap"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                  Add Route Section
+                </button>
+              </div>
+            </div>
 
-      {/* Route Sections Table */}
-      {filterRoute && routeSections.length > 0 && (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Order
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Stop
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Section
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Category
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Fare
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredAndSortedRouteSections.map((routeSection) => (
-                  <tr key={routeSection._id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {routeSection.order}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {routeSection.stopId.stopName}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {routeSection.stopId.sectionNumber}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {routeSection.category}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">
-                      Rs. {routeSection.fare}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        routeSection.isActive
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {routeSection.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleEdit(routeSection)}
-                          className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
-                          title="Edit"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          onClick={() => handleDelete(routeSection._id)}
-                          className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
-                          title="Delete"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+            {/* Sort Controls - Only show when there are route sections */}
+            {filteredAndSortedRouteSections.length > 0 && (
+              <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 rounded-full">
+                      <svg className="h-5 w-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <p className="text-blue-800 font-medium text-lg">
+                      Showing {filteredAndSortedRouteSections.length} route {filteredAndSortedRouteSections.length === 1 ? 'section' : 'sections'}
+                      {filterRoute === 'all' ? (
+                        <span className="text-blue-600 ml-1">
+                          from all routes
+                        </span>
+                      ) : filterRoute && filterRoute !== '' ? (
+                        <span className="text-blue-600 ml-1">
+                          for selected route
+                        </span>
+                      ) : null}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-blue-700 font-medium">Sort by:</span>
+                    {['order', 'fare', 'createdAt'].map((field) => (
+                      <button
+                        key={field}
+                        onClick={() => {
+                          if (sortBy === field) {
+                            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                          } else {
+                            setSortBy(field as typeof sortBy);
+                            setSortOrder('asc');
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                          sortBy === field
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'bg-white text-blue-600 hover:bg-blue-100 border border-blue-200'
+                        }`}
+                      >
+                        {field === 'createdAt' ? 'Created' : field.charAt(0).toUpperCase() + field.slice(1)}
+                        {sortBy === field && (
+                          <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
-      {!filterRoute && (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <div className="text-gray-500 text-lg">📋 Select a Route</div>
-          <p className="text-gray-400 mt-2">
-            Choose a route from the dropdown above to view and manage its route sections
-          </p>
-        </div>
-      )}
+            {/* Route Sections Table */}
+            {filteredAndSortedRouteSections.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Order
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Stop
+                        </th>
+                        {(filterRoute === '' || filterRoute === 'all') && (
+                          <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                            Route
+                          </th>
+                        )}
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Category
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Fare
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {filteredAndSortedRouteSections.map((routeSection) => (
+                        <tr key={routeSection._id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                <span className="text-blue-600 font-bold text-sm">
+                                  {routeSection.order}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">
+                                {routeSection.stopId.stopName}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                Section {routeSection.stopId.sectionNumber}
+                              </div>
+                            </div>
+                          </td>
+                          {(filterRoute === '' || filterRoute === 'all') && (
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">
+                                {routeSection.routeId.routeName}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {routeSection.routeId.routeNumber}
+                              </div>
+                            </td>
+                          )}
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="inline-flex px-3 py-1 text-xs font-medium bg-gray-100 text-gray-900 rounded-full">
+                              {routeSection.category}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-bold text-blue-600">
+                              Rs. {routeSection.fare.toFixed(2)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              routeSection.isActive
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {routeSection.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <div className="flex items-center justify-center space-x-2">
+                              <button
+                                onClick={() => handleEdit(routeSection)}
+                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                                title="Edit Route Section"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => handleDelete(routeSection._id)}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                                title="Delete Route Section"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
-      {filterRoute && filteredAndSortedRouteSections.length === 0 && !loading && (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <div className="text-gray-500 text-lg">📍 No Route Sections Found</div>
-          <p className="text-gray-400 mt-2">
-            {searchTerm
-              ? 'No route sections match your search criteria'
-              : 'This route has no sections yet. Create the first one to get started.'}
-          </p>
-        </div>
-      )}
+            {routeSections.length === 0 && !loading && filterRoute !== '' && (
+              <div className="text-center py-12 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300">
+                <div className="max-w-md mx-auto">
+                  <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-10 h-10 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M19 7h-3V6a2 2 0 0 0-2-2H10a2 2 0 0 0-2 2v1H5a3 3 0 0 0-3 3v6a2 2 0 0 0 2 2h1v1a1 1 0 0 0 2 0v-1h10v1a1 1 0 0 0 2 0v-1h1a2 2 0 0 0 2-2v-6a3 3 0 0 0-3-3zM10 6h4v1h-4V6zm-4 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm12 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-800 mb-2">No Route Sections Found</h3>
+                  <p className="text-gray-600 mb-4">
+                    {filterRoute === 'all' 
+                      ? 'No route sections exist in the system yet.'
+                      : 'This route has no sections yet. Create the first one to get started.'
+                    }
+                  </p>
+                  <button
+                    onClick={() => {
+                      resetForm();
+                      if (filterRoute && filterRoute !== 'all') {
+                        setFormData(prev => ({...prev, routeId: filterRoute}));
+                      }
+                      setShowModal(true);
+                    }}
+                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 mx-auto"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                    </svg>
+                    Add Route Section
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Default state - no route selected */}
+            {filterRoute === '' && !loading && (
+              <div className="text-center py-12 bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl border-2 border-dashed border-blue-300">
+                <div className="max-w-md mx-auto">
+                  <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-10 h-10 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-800 mb-2">Select a Route</h3>
+                  <p className="text-gray-600 mb-4">
+                    Please select a route from the dropdown above to view its sections, or choose "All Routes" to see all route sections.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {routeSections.length > 0 && filteredAndSortedRouteSections.length === 0 && !loading && (
+              <div className="text-center py-12 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300">
+                <div className="max-w-md mx-auto">
+                  <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-10 h-10 text-yellow-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-800 mb-2">No Matching Route Sections</h3>
+                  <p className="text-gray-600 mb-4">
+                    {searchTerm
+                      ? 'No route sections match your search criteria. Try adjusting your search.'
+                      : filterRoute === 'all'
+                      ? 'No route sections found in the system.'
+                      : 'This route has no sections yet. Create the first one to get started.'}
+                  </p>
+                  {(!searchTerm || (filterRoute && filterRoute !== 'all')) && (
+                    <button
+                      onClick={() => {
+                        resetForm();
+                        if (filterRoute && filterRoute !== 'all') {
+                          setFormData(prev => ({...prev, routeId: filterRoute}));
+                        }
+                        setShowModal(true);
+                      }}
+                      className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 mx-auto"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                      </svg>
+                      Add Route Section
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
       {/* Add Route Section Modal */}
       {showModal && (
@@ -428,7 +632,7 @@ function RouteSectionsManager() {
                     <option value="">Select a route</option>
                     {routes.map((route) => (
                       <option key={route._id} value={route._id}>
-                        {route.code} - {route.name} ({route.startLocation} → {route.endLocation})
+                        {route.routeNumber} - {route.routeName} ({route.startPoint} → {route.endPoint})
                       </option>
                     ))}
                   </select>
@@ -539,21 +743,14 @@ function RouteSectionsManager() {
             </div>
           </div>
         </div>
-      )}
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
-}
-
-export default function RouteSectionsPage() {
+}export default function RouteSectionsPage() {
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Route Sections Management</h1>
-        <p className="text-gray-600 mt-2">
-          Manage route sections, assign stops to routes, and configure fare structures
-        </p>
-      </div>
-      <RouteSectionsManager />
-    </div>
+    <RouteSectionsManager />
   );
 }
