@@ -5,7 +5,7 @@ import { useState } from 'react';
 interface Column<T> {
   header: string;
   accessor: keyof T | string;
-  cell?: (value: any) => React.ReactNode;
+  cell?: (value: any, row?: T) => React.ReactNode;
   className?: string;
 }
 
@@ -131,7 +131,7 @@ export function DataTable<T>({
                         key={columnIndex}
                         className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${column.className || ''}`}
                       >
-                        {column.cell ? column.cell(value) : value as React.ReactNode}
+                        {column.cell ? column.cell(value, item) : value as React.ReactNode}
                       </td>
                     );
                   })}
