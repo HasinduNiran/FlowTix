@@ -227,5 +227,38 @@ export const RouteService = {
       console.error(`Error adding section ${sectionId} to route ${routeId}:`, error);
       throw error;
     }
+  },
+
+  async searchRoutesByNumber(searchTerm: string = ''): Promise<Route[]> {
+    try {
+      // Get all routes first, then filter by routeNumber
+      const response = await api.get('/routes?limit=50&isActive=true');
+      const routes = response.data.data.map((route: any) => ({
+        _id: route._id,
+        name: route.routeName,
+        code: route.routeNumber,
+        startLocation: route.startPoint,
+        endLocation: route.endPoint,
+        distance: route.distance,
+        estimatedDuration: route.estimatedDuration,
+        isActive: route.isActive,
+        description: route.description,
+        createdAt: route.createdAt,
+        updatedAt: route.updatedAt
+      }));
+      
+      if (!searchTerm.trim()) {
+        return routes;
+      }
+      
+      // Filter routes by route number containing the search term
+      return routes.filter((route: Route) => 
+        route.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        route.name.toLowerCase().includes(searchTerm.toLowerCase())
+      ).slice(0, 10); // Limit to 10 results
+    } catch (error) {
+      console.error('Error searching routes by number:', error);
+      throw error;
+    }
   }
 }; 
