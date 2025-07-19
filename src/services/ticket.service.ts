@@ -1,27 +1,43 @@
 import api from './api';
 
+export interface Stop {
+  stopId: string;
+  stopName: string;
+  sectionNumber: number;
+}
+
+export interface Passenger {
+  fareType: 'full' | 'half' | 'quarter';
+  quantity: number;
+  farePerUnit: number;
+  subtotal: number;
+}
+
 export interface Ticket {
   _id: string;
-  ticketNumber: string;
-  trip: string;
-  fromStop: string;
-  toStop: string;
-  passengerName?: string;
-  passengerContact?: string;
-  fare: number;
-  status: 'booked' | 'cancelled' | 'completed';
-  seatNumber?: string;
-  issuedBy: string;
-  issuedAt: Date;
+  ticketId: string;
+  routeId: string;
+  busId: string;
+  conductorId: string;
+  dateTime: string;
+  paymentMethod: 'cash' | 'card' | 'online';
+  fromStop: Stop;
+  toStop: Stop;
+  passengers: Passenger[];
+  totalPassengers: number;
+  farePaid: number;
+  paidAmount: number;
+  balance: number;
+  tripNumber: number;
   createdAt: string;
   updatedAt: string;
 }
 
 export const TicketService = {
-  async getAllTickets(filters?: { tripId?: string; status?: string }): Promise<Ticket[]> {
+  async getAllTickets(filters?: { routeId?: string; busId?: string; conductorId?: string }): Promise<Ticket[]> {
     try {
       const response = await api.get('/tickets', { params: filters });
-      return response.data.data;
+      return response.data.data || [];
     } catch (error) {
       console.error('Error fetching tickets:', error);
       throw error;
@@ -38,7 +54,7 @@ export const TicketService = {
     }
   },
   
-  async createTicket(ticketData: Omit<Ticket, '_id' | 'createdAt' | 'updatedAt'>): Promise<Ticket> {
+  async createTicket(ticketData: Partial<Ticket>): Promise<Ticket> {
     try {
       const response = await api.post('/tickets', ticketData);
       return response.data.data;
@@ -47,33 +63,32 @@ export const TicketService = {
       throw error;
     }
   },
-  
-  async updateTicket(id: string, ticketData: Partial<Omit<Ticket, '_id' | 'createdAt' | 'updatedAt'>>): Promise<Ticket> {
+
+  async deleteTicket(id: string): Promise<void> {
     try {
-      const response = await api.put(`/tickets/${id}`, ticketData);
-      return response.data.data;
+      await api.delete(`/tickets/${id}`);
     } catch (error) {
-      console.error(`Error updating ticket with id ${id}:`, error);
+      console.error(`Error deleting ticket with id ${id}:`, error);
       throw error;
     }
   },
-  
-  async cancelTicket(id: string): Promise<Ticket> {
+
+  async getTicketsForTrip(tripId: string): Promise<Ticket[]> {
     try {
-      const response = await api.patch(`/tickets/${id}/cancel`);
-      return response.data.data;
+      const response = await api.get(`/tickets/trip/${tripId}`);
+      return response.data.data || [];
     } catch (error) {
-      console.error(`Error cancelling ticket with id ${id}:`, error);
+      console.error(`Error fetching tickets for trip ${tripId}:`, error);
       throw error;
     }
   },
-  
-  async verifyTicket(ticketNumber: string): Promise<Ticket> {
+
+  async getNextTicketId(): Promise<string> {
     try {
-      const response = await api.get(`/tickets/verify/${ticketNumber}`);
-      return response.data.data;
+      const response = await api.get('/tickets/next-id');
+      return response.data.data.nextTicketId;
     } catch (error) {
-      console.error(`Error verifying ticket number ${ticketNumber}:`, error);
+      console.error('Error getting next ticket ID:', error);
       throw error;
     }
   }
