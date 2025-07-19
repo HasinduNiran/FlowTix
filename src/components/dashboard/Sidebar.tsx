@@ -25,6 +25,7 @@ export default function Sidebar({ role }: SidebarProps) {
     { name: 'Trips', href: '/super-admin/trips', icon: '🚍' },
     { name: 'Tickets', href: '/super-admin/tickets', icon: '🎫' },
     { name: 'Day End', href: '/super-admin/day-end', icon: '🌅' },
+    { name: 'Expenses', href: '/super-admin/expenses', icon: '💰' },
     { name: 'Reports', href: '/super-admin/reports', icon: '📝' },
     { name: 'Settings', href: '/super-admin/settings', icon: '⚙️' },
   ];
@@ -34,6 +35,7 @@ export default function Sidebar({ role }: SidebarProps) {
     { name: 'Buses', href: '/bus-owner/buses', icon: '🚌' },
     { name: 'Tickets', href: '/bus-owner/tickets', icon: '🎫' },
     { name: 'Trips', href: '/bus-owner/trips', icon: '🚍' },
+    { name: 'Expenses', href: '/bus-owner/expenses', icon: '💰' },
     { name: 'Staff', href: '/bus-owner/staff', icon: '👥' },
     { name: 'Reports', href: '/bus-owner/reports', icon: '📝' },
     { name: 'Settings', href: '/bus-owner/settings', icon: '⚙️' },
