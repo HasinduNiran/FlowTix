@@ -100,8 +100,11 @@ export default function SectionDetailsPage({ params }: { params: { id: string } 
             <div className="mt-4">
               <Button 
                 onClick={() => router.back()}
-                className="bg-blue-600 hover:bg-blue-700 text-base"
+                className="bg-blue-600 hover:bg-blue-700 text-base flex items-center gap-2"
               >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                </svg>
                 Go Back
               </Button>
             </div>
@@ -158,27 +161,35 @@ export default function SectionDetailsPage({ params }: { params: { id: string } 
             </div>
           </div>
           {!isEditing ? (
-            <Button 
+            <button
               onClick={() => setIsEditing(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-base"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-base"
             >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+              </svg>
               Edit Section
-            </Button>
+            </button>
           ) : (
-            <div className="space-x-2">
-              <Button 
-                variant="outline" 
+            <div className="flex space-x-2">
+              <button
                 onClick={handleCancel}
-                className="border-gray-300 text-gray-700 text-base"
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-base"
               >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
                 Cancel
-              </Button>
-              <Button 
+              </button>
+              <button
                 onClick={handleSaveChanges}
-                className="bg-green-600 hover:bg-green-700 text-base"
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-base"
               >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
                 Save Changes
-              </Button>
+              </button>
             </div>
           )}
         </div>
