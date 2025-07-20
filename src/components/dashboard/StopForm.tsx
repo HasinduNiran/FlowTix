@@ -31,6 +31,9 @@ export default function StopForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [routeSearchTerm, setRouteSearchTerm] = useState('');
+  const [showRouteSuggestions, setShowRouteSuggestions] = useState(false);
+  const [filteredRoutes, setFilteredRoutes] = useState<Route[]>([]);
   const router = useRouter();
 
   useEffect(() => {
@@ -46,8 +49,26 @@ export default function StopForm({
         routeId: typeof initialData.routeId === 'string' ? initialData.routeId : initialData.routeId._id,
         isActive: initialData.isActive
       });
+      
+      // Set route search term for editing
+      if (typeof initialData.routeId === 'object') {
+        setRouteSearchTerm(`${initialData.routeId.routeNumber} - ${initialData.routeId.routeName}`);
+      }
     }
   }, [initialData, isEdit]);
+
+  useEffect(() => {
+    // Filter routes based on search term
+    if (routeSearchTerm.trim()) {
+      const filtered = availableRoutes.filter(route =>
+        (route.code && route.code.toLowerCase().includes(routeSearchTerm.toLowerCase())) ||
+        (route.name && route.name.toLowerCase().includes(routeSearchTerm.toLowerCase()))
+      );
+      setFilteredRoutes(filtered.slice(0, 5)); // Limit to 5 suggestions
+    } else {
+      setFilteredRoutes([]);
+    }
+  }, [routeSearchTerm, availableRoutes]);
 
   const fetchAvailableRoutes = async () => {
     try {
@@ -281,20 +302,101 @@ export default function StopForm({
                         <span className="text-sm text-gray-600">Loading routes...</span>
                       </div>
                     ) : (
-                      <select
-                        value={formData.routeId}
-                        onChange={(e) => setFormData({ ...formData, routeId: e.target.value })}
-                        required
-                        className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
-                      >
-                        <option value="">Select a route</option>
-                        {availableRoutes.map((route) => (
-                          <option key={route._id} value={route._id}>
-                            {route.code} - {route.name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <Input
+                          type="text"
+                          value={routeSearchTerm}
+                          onChange={(e) => {
+                            setRouteSearchTerm(e.target.value);
+                            setShowRouteSuggestions(true);
+                          }}
+                          onFocus={() => {
+                            if (filteredRoutes.length > 0) {
+                              setShowRouteSuggestions(true);
+                            }
+                          }}
+                          onBlur={() => {
+                            // Delay hiding to allow clicking on suggestions
+                            setTimeout(() => setShowRouteSuggestions(false), 200);
+                          }}
+                          placeholder="Type route number or name..."
+                          required
+                          className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+                        />
+                        
+                        {/* Route Suggestions Dropdown */}
+                        {showRouteSuggestions && filteredRoutes.length > 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-blue-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                            {filteredRoutes.map((route) => (
+                              <div
+                                key={route._id}
+                                className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                                onClick={() => {
+                                  setFormData({ ...formData, routeId: route._id });
+                                  setRouteSearchTerm(`${route.code} - ${route.name}`);
+                                  setShowRouteSuggestions(false);
+                                }}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <div className="font-medium text-gray-900">{route.code} - {route.name}</div>
+                                    <div className="text-sm text-gray-500">
+                                      {route.startLocation} → {route.endLocation}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center">
+                                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                      route.isActive 
+                                        ? 'bg-green-100 text-green-800' 
+                                        : 'bg-gray-100 text-gray-800'
+                                    }`}>
+                                      {route.isActive ? 'Active' : 'Inactive'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {/* No results message */}
+                        {showRouteSuggestions && filteredRoutes.length === 0 && routeSearchTerm.trim().length >= 1 && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-blue-300 rounded-lg shadow-lg">
+                            <div className="px-4 py-3 text-center text-gray-500">
+                              <div className="flex items-center justify-center">
+                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                No routes found
+                              </div>
+                              <div className="text-xs mt-1">
+                                Try searching with different terms
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Clear route button */}
+                        {routeSearchTerm && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRouteSearchTerm('');
+                              setFormData({ ...formData, routeId: '' });
+                              setShowRouteSuggestions(false);
+                            }}
+                            className="absolute right-2 top-2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
                     )}
+                    <p className="mt-1 text-xs text-gray-500">
+                      Start typing to search for available routes
+                    </p>
                   </div>
 
                   <div>
@@ -320,14 +422,17 @@ export default function StopForm({
                 type="button"
                 onClick={handleCancel}
                 disabled={isSubmitting}
-                className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-medium transition-all duration-200"
+                className="px-8 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700 rounded-xl font-medium shadow-md hover:shadow-lg transition-all duration-200 flex items-center transform hover:scale-105"
               >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={isSubmitting || routesLoading}
-                className="px-8 py-3 bg-gradient-to-r from-red-600 to-pink-600 text-white hover:from-red-700 hover:to-pink-700 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 flex items-center"
+                className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 flex items-center transform hover:scale-105"
               >
                 {isSubmitting ? (
                   <>

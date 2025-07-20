@@ -15,6 +15,10 @@ export default function StopsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRoute, setSelectedRoute] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [sectionSortOrder, setSectionSortOrder] = useState<'asc' | 'desc' | null>(null);
+  const [routeSearchTerm, setRouteSearchTerm] = useState('');
+  const [showRouteSuggestions, setShowRouteSuggestions] = useState(false);
+  const [filteredRoutes, setFilteredRoutes] = useState<Route[]>([]);
   const router = useRouter();
 
   useEffect(() => {
@@ -23,7 +27,20 @@ export default function StopsPage() {
 
   useEffect(() => {
     filterStops();
-  }, [stops, searchTerm, selectedRoute, selectedStatus]);
+  }, [stops, searchTerm, selectedRoute, selectedStatus, sectionSortOrder]);
+
+  useEffect(() => {
+    // Filter routes based on search term
+    if (routeSearchTerm.trim()) {
+      const filtered = routes.filter(route =>
+        route.code.toLowerCase().includes(routeSearchTerm.toLowerCase()) ||
+        route.name.toLowerCase().includes(routeSearchTerm.toLowerCase())
+      );
+      setFilteredRoutes(filtered.slice(0, 5)); // Limit to 5 suggestions
+    } else {
+      setFilteredRoutes([]);
+    }
+  }, [routeSearchTerm, routes]);
 
   const fetchData = async () => {
     try {
@@ -71,7 +88,26 @@ export default function StopsPage() {
       );
     }
 
+    // Apply section number sorting
+    if (sectionSortOrder) {
+      filtered = filtered.sort((a, b) => {
+        if (sectionSortOrder === 'asc') {
+          return a.sectionNumber - b.sectionNumber;
+        } else {
+          return b.sectionNumber - a.sectionNumber;
+        }
+      });
+    }
+
     setFilteredStops(filtered);
+  };
+
+  const handleSectionSort = () => {
+    if (sectionSortOrder === null || sectionSortOrder === 'desc') {
+      setSectionSortOrder('asc');
+    } else {
+      setSectionSortOrder('desc');
+    }
   };
 
   const handleDeleteStop = async (stopId: string) => {
@@ -156,19 +192,77 @@ export default function StopsPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Route <span className="text-red-500">*</span></label>
-              <select
-                value={selectedRoute}
-                onChange={(e) => setSelectedRoute(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
-              >
-                <option value="">Select a route to view stops</option>
-                <option value="all">All Routes</option>
-                {routes.map((route) => (
-                  <option key={route._id} value={route._id}>
-                    {route.code} - {route.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Type route number or name..."
+                  value={routeSearchTerm}
+                  onChange={(e) => {
+                    setRouteSearchTerm(e.target.value);
+                    setShowRouteSuggestions(true);
+                  }}
+                  onFocus={() => {
+                    if (filteredRoutes.length > 0) {
+                      setShowRouteSuggestions(true);
+                    }
+                  }}
+                  onBlur={() => {
+                    // Delay hiding to allow clicking on suggestions
+                    setTimeout(() => setShowRouteSuggestions(false), 200);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
+                />
+                
+                {/* Route Suggestions Dropdown */}
+                {showRouteSuggestions && filteredRoutes.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    <div
+                      className="px-3 py-2 hover:bg-red-50 cursor-pointer border-b border-gray-100 transition-colors"
+                      onClick={() => {
+                        setSelectedRoute('all');
+                        setRouteSearchTerm('All Routes');
+                        setShowRouteSuggestions(false);
+                      }}
+                    >
+                      <div className="font-medium text-gray-900">All Routes</div>
+                      <div className="text-sm text-gray-500">Show all available routes</div>
+                    </div>
+                    {filteredRoutes.map((route) => (
+                      <div
+                        key={route._id}
+                        className="px-3 py-2 hover:bg-red-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                        onClick={() => {
+                          setSelectedRoute(route._id);
+                          setRouteSearchTerm(`${route.code} - ${route.name}`);
+                          setShowRouteSuggestions(false);
+                        }}
+                      >
+                        <div className="font-medium text-gray-900">{route.code} - {route.name}</div>
+                        <div className="text-sm text-gray-500">
+                          Status: {route.isActive ? 'Active' : 'Inactive'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Clear route button */}
+                {routeSearchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRouteSearchTerm('');
+                      setSelectedRoute('');
+                      setShowRouteSuggestions(false);
+                    }}
+                    className="absolute right-2 top-2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
@@ -215,8 +309,29 @@ export default function StopsPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Route
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Section
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                    onClick={handleSectionSort}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Section</span>
+                      <div className="flex flex-col">
+                        <svg 
+                          className={`w-3 h-3 ${sectionSortOrder === 'asc' ? 'text-red-600' : 'text-gray-400'} transition-colors`} 
+                          fill="currentColor" 
+                          viewBox="0 0 20 20"
+                        >
+                          <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+                        </svg>
+                        <svg 
+                          className={`w-3 h-3 -mt-1 ${sectionSortOrder === 'desc' ? 'text-red-600' : 'text-gray-400'} transition-colors`} 
+                          fill="currentColor" 
+                          viewBox="0 0 20 20"
+                        >
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    </div>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
