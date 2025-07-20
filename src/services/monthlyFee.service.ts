@@ -134,5 +134,57 @@ export const MonthlyFeeService = {
       console.error('Error generating bill:', error);
       throw error;
     }
+  },
+
+  async getMonthlyFeesByOwner(ownerId: string, filters: Omit<MonthlyFeeFilters, 'ownerId'> = {}): Promise<{
+    data: MonthlyFee[];
+    total: number;
+    currentPage: number;
+    totalPages: number;
+  }> {
+    try {
+      const params = new URLSearchParams();
+      params.append('ownerId', ownerId);
+      
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== '') {
+          params.append(key, value.toString());
+        }
+      });
+      
+      console.log('Fetching monthly fees for owner:', ownerId, 'with filters:', filters);
+      const response = await api.get(`/monthly-fees?${params.toString()}`);
+      console.log('Monthly fees response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching monthly fees for owner:', error);
+      throw error;
+    }
+  },
+
+  async downloadBill(monthlyFeeId: string, busNumber: string, month: string): Promise<void> {
+    try {
+      const response = await api.get(`/monthly-fees/${monthlyFeeId}/bill`, {
+        responseType: 'blob'
+      });
+      
+      // Create blob link to download
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create temporary link element
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `MonthlyFee_${busNumber}_${month}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading bill:', error);
+      throw error;
+    }
   }
 };
