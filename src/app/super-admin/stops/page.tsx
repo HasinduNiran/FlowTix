@@ -16,6 +16,8 @@ export default function StopsPage() {
   const [selectedRoute, setSelectedRoute] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [sectionSortOrder, setSectionSortOrder] = useState<'asc' | 'desc' | null>(null);
+  const [stopNameSortOrder, setStopNameSortOrder] = useState<'asc' | 'desc' | null>(null);
+  const [routeSortOrder, setRouteSortOrder] = useState<'asc' | 'desc' | null>(null);
   const [routeSearchTerm, setRouteSearchTerm] = useState('');
   const [showRouteSuggestions, setShowRouteSuggestions] = useState(false);
   const [filteredRoutes, setFilteredRoutes] = useState<Route[]>([]);
@@ -27,7 +29,7 @@ export default function StopsPage() {
 
   useEffect(() => {
     filterStops();
-  }, [stops, searchTerm, selectedRoute, selectedStatus, sectionSortOrder]);
+  }, [stops, searchTerm, selectedRoute, selectedStatus, sectionSortOrder, stopNameSortOrder, routeSortOrder]);
 
   useEffect(() => {
     // Filter routes based on search term
@@ -99,6 +101,30 @@ export default function StopsPage() {
       });
     }
 
+    // Apply stop name sorting
+    if (stopNameSortOrder) {
+      filtered = filtered.sort((a, b) => {
+        if (stopNameSortOrder === 'asc') {
+          return a.stopName.localeCompare(b.stopName);
+        } else {
+          return b.stopName.localeCompare(a.stopName);
+        }
+      });
+    }
+
+    // Apply route sorting
+    if (routeSortOrder) {
+      filtered = filtered.sort((a, b) => {
+        const routeA = getRouteDisplay(a.routeId!);
+        const routeB = getRouteDisplay(b.routeId!);
+        if (routeSortOrder === 'asc') {
+          return routeA.localeCompare(routeB);
+        } else {
+          return routeB.localeCompare(routeA);
+        }
+      });
+    }
+
     setFilteredStops(filtered);
   };
 
@@ -108,6 +134,31 @@ export default function StopsPage() {
     } else {
       setSectionSortOrder('desc');
     }
+    // Clear other sort orders
+    setStopNameSortOrder(null);
+    setRouteSortOrder(null);
+  };
+
+  const handleStopNameSort = () => {
+    if (stopNameSortOrder === null || stopNameSortOrder === 'desc') {
+      setStopNameSortOrder('asc');
+    } else {
+      setStopNameSortOrder('desc');
+    }
+    // Clear other sort orders
+    setSectionSortOrder(null);
+    setRouteSortOrder(null);
+  };
+
+  const handleRouteSort = () => {
+    if (routeSortOrder === null || routeSortOrder === 'desc') {
+      setRouteSortOrder('asc');
+    } else {
+      setRouteSortOrder('desc');
+    }
+    // Clear other sort orders
+    setSectionSortOrder(null);
+    setStopNameSortOrder(null);
   };
 
   const handleDeleteStop = async (stopId: string) => {
@@ -303,11 +354,53 @@ export default function StopsPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Stop Details
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                    onClick={handleStopNameSort}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Stop Details</span>
+                      <div className="flex flex-col">
+                        <svg 
+                          className={`w-3 h-3 ${stopNameSortOrder === 'asc' ? 'text-red-600' : 'text-gray-400'} transition-colors`} 
+                          fill="currentColor" 
+                          viewBox="0 0 20 20"
+                        >
+                          <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+                        </svg>
+                        <svg 
+                          className={`w-3 h-3 -mt-1 ${stopNameSortOrder === 'desc' ? 'text-red-600' : 'text-gray-400'} transition-colors`} 
+                          fill="currentColor" 
+                          viewBox="0 0 20 20"
+                        >
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Route
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                    onClick={handleRouteSort}
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>Route</span>
+                      <div className="flex flex-col">
+                        <svg 
+                          className={`w-3 h-3 ${routeSortOrder === 'asc' ? 'text-red-600' : 'text-gray-400'} transition-colors`} 
+                          fill="currentColor" 
+                          viewBox="0 0 20 20"
+                        >
+                          <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+                        </svg>
+                        <svg 
+                          className={`w-3 h-3 -mt-1 ${routeSortOrder === 'desc' ? 'text-red-600' : 'text-gray-400'} transition-colors`} 
+                          fill="currentColor" 
+                          viewBox="0 0 20 20"
+                        >
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    </div>
                   </th>
                   <th 
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none"
@@ -332,12 +425,6 @@ export default function StopsPage() {
                         </svg>
                       </div>
                     </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Created
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -368,18 +455,6 @@ export default function StopsPage() {
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                         #{stop.sectionNumber}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        stop.isActive 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {stop.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(stop.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
