@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Toast } from '@/components/ui/Toast';
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 import { ExpenseTypeService } from '@/services/expense.service';
 import { BusService } from '@/services/bus.service';
 
@@ -33,6 +34,8 @@ export default function ExpenseTypeDetailPage() {
   const [expenseType, setExpenseType] = useState<ExpenseType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Toast states
   const [showToastFlag, setShowToastFlag] = useState(false);
@@ -78,19 +81,41 @@ export default function ExpenseTypeDetailPage() {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete this expense type?')) {
-      return;
-    }
-
+    if (!expenseType) return;
+    
+    setIsDeleting(true);
     try {
       await ExpenseTypeService.deleteExpenseType(id);
-      showToast('Expense type deleted successfully!', 'success');
-      router.push('/super-admin/expenses?tab=types');
+      
+      // Show success toast
+      setToastConfig({
+        type: 'success',
+        title: 'Expense Type Deleted Successfully!',
+        message: `"${expenseType.expenseName}" has been permanently removed from the system. All associated data has been safely deleted.`
+      });
+      setShowToastFlag(true);
+      setShowConfirmModal(false);
+      
+      // Navigate after a short delay to show the toast
+      setTimeout(() => {
+        router.push('/super-admin/expenses?tab=types');
+      }, 2000);
     } catch (err) {
-      setError('Failed to delete expense type. Please try again.');
-      showToast('Failed to delete expense type. Please try again.', 'error');
+      setToastConfig({
+        type: 'error',
+        title: 'Delete Failed',
+        message: `Failed to delete "${expenseType.expenseName}". This might be due to existing transactions or dependencies. Please try again or contact support.`
+      });
+      setShowToastFlag(true);
+      setShowConfirmModal(false);
       console.error('Error deleting expense type:', err);
+    } finally {
+      setIsDeleting(false);
     }
+  };
+
+  const handleDeleteClick = () => {
+    setShowConfirmModal(true);
   };
 
   const getBusDisplay = () => {
@@ -248,7 +273,7 @@ export default function ExpenseTypeDetailPage() {
                   Edit Type
                 </Button>
                 <Button
-                  onClick={handleDelete}
+                  onClick={handleDeleteClick}
                   className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 shadow-lg hover:shadow-xl transition-all duration-200"
                 >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -347,6 +372,19 @@ export default function ExpenseTypeDetailPage() {
         </div>
       </div>
       
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={handleDelete}
+        title="Delete Expense Type Permanently?"
+        message={`Are you absolutely sure you want to delete "${expenseType?.expenseName}"? This action cannot be undone and will permanently remove this expense type and may affect related transaction records.`}
+        confirmText="Yes, Delete Type"
+        cancelText="Cancel"
+        type="danger"
+        isLoading={isDeleting}
+      />
+      
       {/* Toast Component */}
       {showToastFlag && (
         <Toast
@@ -355,6 +393,7 @@ export default function ExpenseTypeDetailPage() {
           title={toastConfig.title}
           message={toastConfig.message}
           onClose={hideToast}
+          duration={toastConfig.type === 'success' ? 3000 : 5000}
         />
       )}
     </div>

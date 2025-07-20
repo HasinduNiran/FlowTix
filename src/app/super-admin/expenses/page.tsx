@@ -6,6 +6,7 @@ import { ExpenseTypeService, ExpenseTransactionService, ExpenseType, ExpenseTran
 import { BusService, Bus } from '@/services/bus.service';
 import { Button } from '@/components/ui/Button';
 import { Toast } from '@/components/ui/Toast';
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 
 export default function ExpensesPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'types' | 'transactions'>('overview');
@@ -22,6 +23,16 @@ export default function ExpensesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBus, setSelectedBus] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  
+  // Confirmation Modal states
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmModalConfig, setConfirmModalConfig] = useState({
+    title: '',
+    message: '',
+    confirmText: '',
+    onConfirm: () => {},
+    isLoading: false
+  });
   
   // Toast states
   const [showToast, setShowToast] = useState(false);
@@ -59,9 +70,23 @@ export default function ExpensesPage() {
   };
 
   const handleDeleteExpenseType = async (typeId: string) => {
-    if (!window.confirm('Are you sure you want to delete this expense type?')) {
-      return;
-    }
+    // Find the expense type to get its name for the toast message
+    const expenseTypeToDelete = expenseTypes.find(type => type._id === typeId);
+    const expenseTypeName = expenseTypeToDelete?.expenseName || 'expense type';
+    
+    // Show confirmation modal
+    setConfirmModalConfig({
+      title: 'Delete Expense Type Permanently?',
+      message: `Are you absolutely sure you want to delete "${expenseTypeName}"? This action cannot be undone and will permanently remove this expense type and may affect related transaction records.`,
+      confirmText: 'Yes, Delete Type',
+      onConfirm: () => confirmDeleteExpenseType(typeId, expenseTypeName),
+      isLoading: false
+    });
+    setShowConfirmModal(true);
+  };
+
+  const confirmDeleteExpenseType = async (typeId: string, expenseTypeName: string) => {
+    setConfirmModalConfig(prev => ({ ...prev, isLoading: true }));
     
     try {
       await ExpenseTypeService.deleteExpenseType(typeId);
@@ -70,10 +95,11 @@ export default function ExpensesPage() {
       // Show success toast
       setToastConfig({
         type: 'success',
-        title: 'Expense Type Deleted',
-        message: 'The expense type has been successfully deleted.'
+        title: 'Expense Type Deleted Successfully!',
+        message: `"${expenseTypeName}" has been permanently removed from the system. All associated data has been safely deleted.`
       });
       setShowToast(true);
+      setShowConfirmModal(false);
       
     } catch (err) {
       console.error('Error deleting expense type:', err);
@@ -81,18 +107,36 @@ export default function ExpensesPage() {
       // Show error toast
       setToastConfig({
         type: 'error',
-        title: 'Deletion Failed',
-        message: 'Failed to delete expense type. Please try again or contact support if the problem persists.'
+        title: 'Delete Failed',
+        message: `Failed to delete "${expenseTypeName}". This might be due to existing transactions or dependencies. Please try again or contact support.`
       });
       setShowToast(true);
+      setShowConfirmModal(false);
       setError('Failed to delete expense type. Please try again.');
+    } finally {
+      setConfirmModalConfig(prev => ({ ...prev, isLoading: false }));
     }
   };
 
   const handleDeleteTransaction = async (transactionId: string) => {
-    if (!window.confirm('Are you sure you want to delete this transaction?')) {
-      return;
-    }
+    // Find the transaction to get its details for the toast message
+    const transactionToDelete = expenseTransactions.find(transaction => transaction._id === transactionId);
+    const expenseTypeName = transactionToDelete ? getExpenseTypeDisplay(transactionToDelete.expenseTypeId) : 'Unknown';
+    const amount = transactionToDelete?.amount || 0;
+    
+    // Show confirmation modal
+    setConfirmModalConfig({
+      title: 'Delete Transaction Permanently?',
+      message: `Are you absolutely sure you want to delete this ${expenseTypeName} transaction (Rs. ${amount.toLocaleString()})? This action cannot be undone and will permanently remove this transaction record.`,
+      confirmText: 'Yes, Delete Transaction',
+      onConfirm: () => confirmDeleteTransaction(transactionId, expenseTypeName, amount),
+      isLoading: false
+    });
+    setShowConfirmModal(true);
+  };
+
+  const confirmDeleteTransaction = async (transactionId: string, expenseTypeName: string, amount: number) => {
+    setConfirmModalConfig(prev => ({ ...prev, isLoading: true }));
     
     try {
       await ExpenseTransactionService.deleteExpenseTransaction(transactionId);
@@ -101,10 +145,11 @@ export default function ExpensesPage() {
       // Show success toast
       setToastConfig({
         type: 'success',
-        title: 'Transaction Deleted',
-        message: 'The expense transaction has been successfully deleted.'
+        title: 'Transaction Deleted Successfully!',
+        message: `${expenseTypeName} transaction worth Rs. ${amount.toLocaleString()} has been permanently removed from your records.`
       });
       setShowToast(true);
+      setShowConfirmModal(false);
       
     } catch (err) {
       console.error('Error deleting transaction:', err);
@@ -112,11 +157,14 @@ export default function ExpensesPage() {
       // Show error toast
       setToastConfig({
         type: 'error',
-        title: 'Deletion Failed',
-        message: 'Failed to delete transaction. Please try again or contact support if the problem persists.'
+        title: 'Delete Failed',
+        message: `Unable to delete the ${expenseTypeName} transaction. Please check your connection and try again, or contact support if the issue persists.`
       });
       setShowToast(true);
+      setShowConfirmModal(false);
       setError('Failed to delete transaction. Please try again.');
+    } finally {
+      setConfirmModalConfig(prev => ({ ...prev, isLoading: false }));
     }
   };
 
@@ -894,6 +942,19 @@ export default function ExpensesPage() {
             </Button>
           </div>
         )}
+        
+        {/* Confirmation Modal */}
+        <ConfirmationModal
+          isOpen={showConfirmModal}
+          onClose={() => setShowConfirmModal(false)}
+          onConfirm={confirmModalConfig.onConfirm}
+          title={confirmModalConfig.title}
+          message={confirmModalConfig.message}
+          confirmText={confirmModalConfig.confirmText}
+          cancelText="Cancel"
+          type="danger"
+          isLoading={confirmModalConfig.isLoading}
+        />
         
         {/* Toast Notification */}
         <Toast

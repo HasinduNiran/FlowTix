@@ -4,12 +4,15 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Toast } from '@/components/ui/Toast';
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal';
 import { ExpenseTransactionService, ExpenseTransaction } from '@/services/expense.service';
 
 export default function TransactionDetailPage() {
   const [transaction, setTransaction] = useState<ExpenseTransaction | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Toast states
   const [showToastFlag, setShowToastFlag] = useState(false);
