@@ -105,88 +105,109 @@ const UserModal: React.FC<UserModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={onClose}></div>
-        
-        <div className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
-          <form onSubmit={handleSubmit}>
-            <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
-              <div className="sm:flex sm:items-start">
-                <div className="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
-                  <h3 className="text-base font-semibold leading-6 text-gray-900 mb-4">
-                    {title}
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Username
-                      </label>
-                      <Input
-                        type="text"
-                        value={formData.username}
-                        onChange={(e) => handleInputChange('username', e.target.value)}
-                        placeholder="Enter username"
-                        error={errors.username}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Password {user && '(leave empty to keep current)'}
-                      </label>
-                      <Input
-                        type="password"
-                        value={formData.password}
-                        onChange={(e) => handleInputChange('password', e.target.value)}
-                        placeholder={user ? "Leave empty to keep current" : "Enter password"}
-                        error={errors.password}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Role
-                      </label>
-                      <select
-                        value={formData.role}
-                        onChange={(e) => handleInputChange('role', e.target.value as BackendUserRole)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="conductor">Conductor</option>
-                        <option value="manager">Manager</option>
-                        <option value="owner">Owner</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
-              <Button
-                type="submit"
-                variant="primary"
-                isLoading={loading}
-                className="sm:ml-3"
-              >
-                {user ? 'Update' : 'Create'} User
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={onClose}
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-            </div>
-          </form>
+    <>
+      {/* Header */}
+      <div className="flex items-center justify-between p-6 pb-4 border-b border-gray-100">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">
+            {title}
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">Configure user details and permissions</p>
         </div>
+        <button 
+          onClick={onClose}
+          className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200 group"
+        >
+          <svg className="h-5 w-5 text-gray-400 group-hover:text-gray-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
-    </div>
+      
+      {/* Form Content */}
+      <div className="p-6">
+        <form id="userForm" onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Username
+            </label>
+            <input
+              type="text"
+              value={formData.username}
+              onChange={(e) => handleInputChange('username', e.target.value)}
+              placeholder="Enter username"
+              required
+              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            />
+            {errors.username && (
+              <p className="mt-1 text-sm text-red-600">{errors.username}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Password {user && '(leave empty to keep current)'}
+            </label>
+            <input
+              type="password"
+              value={formData.password}
+              onChange={(e) => handleInputChange('password', e.target.value)}
+              placeholder={user ? "Leave empty to keep current" : "Enter password (min 8 characters)"}
+              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            />
+            {errors.password && (
+              <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Role
+            </label>
+            <select
+              value={formData.role}
+              onChange={(e) => handleInputChange('role', e.target.value as BackendUserRole)}
+              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
+            >
+              <option value="">Select a role</option>
+              <option value="conductor">Conductor</option>
+              <option value="manager">Manager</option>
+              <option value="owner">Owner</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+
+          {/* Additional permissions or settings can be added here */}
+        </form>
+      </div>
+      
+      {/* Footer */}
+      <div className="flex justify-end gap-3 p-6 pt-4 border-t border-gray-100 bg-gray-50 rounded-b-xl">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={loading}
+          className="px-6 py-2.5 border-2 border-gray-300 text-gray-700 hover:bg-gray-100 hover:border-gray-400 rounded-lg font-medium transition-all"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          form="userForm"
+          disabled={loading}
+          className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 disabled:opacity-50"
+        >
+          {loading ? (
+            <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+            </svg>
+          )}
+          {user ? 'Update User' : 'Create User'}
+        </button>
+      </div>
+    </>
   );
 };
 
