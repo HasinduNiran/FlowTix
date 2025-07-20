@@ -77,8 +77,10 @@ export default function ExpenseTransactionForm({
     try {
       setExpenseTypesLoading(true);
       const expenseTypes = await ExpenseTypeService.getAllExpenseTypes();
-      setAvailableExpenseTypes(expenseTypes.filter(type => type.isActive));
-      setFilteredExpenseTypes(expenseTypes.filter(type => type.isActive));
+      console.log('Fetched expense types:', expenseTypes);
+      const activeTypes = expenseTypes.filter(type => type.isActive);
+      setAvailableExpenseTypes(activeTypes);
+      setFilteredExpenseTypes(activeTypes);
     } catch (error) {
       console.error('Error fetching expense types:', error);
       if (error instanceof Error && error.message.includes('401')) {
@@ -97,6 +99,7 @@ export default function ExpenseTransactionForm({
     try {
       setBusesLoading(true);
       const buses = await BusService.getAllBuses();
+      console.log('Fetched buses:', buses);
       setAvailableBuses(buses);
       setFilteredBuses(buses);
     } catch (error) {
@@ -114,15 +117,28 @@ export default function ExpenseTransactionForm({
   // Filter expense types based on selected bus
   useEffect(() => {
     if (selectedBusId) {
-      const filtered = availableExpenseTypes.filter(expenseType => 
-        expenseType.busId === selectedBusId
-      );
+      const filtered = availableExpenseTypes.filter(expenseType => {
+        // Handle both string and object cases for busId
+        const busId = typeof expenseType.busId === 'string' 
+          ? expenseType.busId 
+          : expenseType.busId._id;
+        return busId === selectedBusId;
+      });
       setFilteredExpenseTypes(filtered);
+      
+      console.log('Selected Bus ID:', selectedBusId);
+      console.log('Available Expense Types:', availableExpenseTypes);
+      console.log('Filtered Expense Types:', filtered);
       
       // Reset expense type selection if current selection doesn't match the bus
       const currentExpenseType = availableExpenseTypes.find(et => et._id === formData.expenseTypeId);
       if (currentExpenseType && currentExpenseType.busId !== selectedBusId) {
-        setFormData(prev => ({ ...prev, expenseTypeId: '' }));
+        const currentBusId = typeof currentExpenseType.busId === 'string' 
+          ? currentExpenseType.busId 
+          : currentExpenseType.busId._id;
+        if (currentBusId !== selectedBusId) {
+          setFormData(prev => ({ ...prev, expenseTypeId: '' }));
+        }
       }
     } else {
       setFilteredExpenseTypes(availableExpenseTypes);
@@ -143,6 +159,7 @@ export default function ExpenseTransactionForm({
 
   // Handle bus selection
   const handleBusSelect = (bus: Bus) => {
+    console.log('Bus selected:', bus);
     setSelectedBusId(bus._id);
     setBusSearchTerm(bus.busNumber);
     setShowBusSuggestions(false);
@@ -477,9 +494,14 @@ export default function ExpenseTransactionForm({
                         ))}
                       </select>
                     )}
-                    {selectedBusId && filteredExpenseTypes.length === 0 && (
+                    {selectedBusId && filteredExpenseTypes.length === 0 && !expenseTypesLoading && (
                       <p className="text-sm text-amber-600 mt-1">
-                        No expense types found for the selected bus.
+                        No expense types found for bus "{busSearchTerm}".
+                        {availableExpenseTypes.length > 0 && (
+                          <span className="block text-xs text-gray-500">
+                            Total available expense types: {availableExpenseTypes.length}
+                          </span>
+                        )}
                       </p>
                     )}
                   </div>
