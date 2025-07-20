@@ -94,7 +94,17 @@ export const TicketService = {
     }
   },
 
-  async getTicketsByOwner(ownerId: string, filters?: { date?: string; busId?: string; page?: number; limit?: number; sort?: string }): Promise<{tickets: Ticket[], total: number, totalPages: number, currentPage: number}> {
+  async getTicketsByOwner(ownerId: string, filters?: { 
+    date?: string; 
+    busId?: string; 
+    fromStopId?: string; 
+    toStopId?: string; 
+    paymentMethod?: string; 
+    tripNumber?: string; 
+    page?: number; 
+    limit?: number; 
+    sort?: string 
+  }): Promise<{tickets: Ticket[], total: number, totalPages: number, currentPage: number}> {
     try {
       console.log('getTicketsByOwner called with:', { ownerId, filters });
       
@@ -135,6 +145,14 @@ export const TicketService = {
       if (filters?.date) {
         params.startDate = filters.date;
         params.endDate = filters.date;
+      }
+      
+      if (filters?.paymentMethod) {
+        params.paymentMethod = filters.paymentMethod;
+      }
+      
+      if (filters?.tripNumber) {
+        params.tripNumber = filters.tripNumber;
       }
 
       let allTickets: Ticket[] = [];
@@ -190,8 +208,21 @@ export const TicketService = {
             }
             
             const isOwnerTicket = ticketBusId && busIds.includes(ticketBusId);
-            console.log(`Ticket ${ticket._id} bus ${ticketBusId} is owner ticket:`, isOwnerTicket);
-            return isOwnerTicket;
+            
+            // Additional client-side filtering for stops
+            let passesFromStopFilter = true;
+            let passesToStopFilter = true;
+            
+            if (filters?.fromStopId && ticket.fromStop) {
+              passesFromStopFilter = ticket.fromStop.stopId === filters.fromStopId;
+            }
+            
+            if (filters?.toStopId && ticket.toStop) {
+              passesToStopFilter = ticket.toStop.stopId === filters.toStopId;
+            }
+            
+            console.log(`Ticket ${ticket._id} bus ${ticketBusId} is owner ticket:`, isOwnerTicket, 'passes filters:', passesFromStopFilter && passesToStopFilter);
+            return isOwnerTicket && passesFromStopFilter && passesToStopFilter;
           });
           
           console.log('Filtered tickets:', allTickets.length, 'out of', allTicketsData.length);

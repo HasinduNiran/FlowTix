@@ -4,15 +4,28 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { TicketService, Ticket } from '@/services/ticket.service';
 import { BusService, Bus } from '@/services/bus.service';
+import { StopService, Stop } from '@/services/stop.service';
+
+interface RouteStop {
+  _id: string;
+  stopName: string;
+  sectionNumber: number;
+}
 
 export default function TicketsPage() {
   const { user } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [buses, setBuses] = useState<Bus[]>([]);
+  const [routeStops, setRouteStops] = useState<Stop[]>([]);
+  const [availableTripNumbers, setAvailableTripNumbers] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [selectedBus, setSelectedBus] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedFromStop, setSelectedFromStop] = useState<string>('');
+  const [selectedToStop, setSelectedToStop] = useState<string>('');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
+  const [selectedTripNumber, setSelectedTripNumber] = useState<string>('');
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -39,6 +52,10 @@ export default function TicketsPage() {
       
       if (selectedBus) filters.busId = selectedBus;
       if (selectedDate) filters.date = selectedDate;
+      if (selectedFromStop) filters.fromStopId = selectedFromStop;
+      if (selectedToStop) filters.toStopId = selectedToStop;
+      if (selectedPaymentMethod) filters.paymentMethod = selectedPaymentMethod;
+      if (selectedTripNumber) filters.tripNumber = selectedTripNumber;
       
       console.log('Fetching tickets with filters:', filters);
       console.log('Owner ID:', user.id);
@@ -47,6 +64,13 @@ export default function TicketsPage() {
       console.log('Tickets result:', result);
       
       setTickets(result.tickets);
+      
+      // Extract unique trip numbers from the results for the trip number filter
+      const uniqueTripNumbers = [...new Set(result.tickets.map(ticket => ticket.tripNumber))]
+        .filter(num => num != null)
+        .sort((a, b) => b - a); // Sort descending (newest first)
+      setAvailableTripNumbers(uniqueTripNumbers);
+      
       setPagination({
         page: result.currentPage,
         limit: pagination.limit,
@@ -75,13 +99,58 @@ export default function TicketsPage() {
     }
   };
 
+  const fetchRouteStops = async (busId: string) => {
+    if (!busId) {
+      setRouteStops([]);
+      return;
+    }
+
+    try {
+      const bus = buses.find(b => b._id === busId);
+      if (!bus) return;
+
+      let routeId: string;
+      if (typeof bus.routeId === 'object' && bus.routeId) {
+        routeId = bus.routeId._id;
+      } else {
+        routeId = bus.routeId as string;
+      }
+
+      if (routeId) {
+        console.log('Fetching stops for route:', routeId);
+        const stops = await StopService.getStopsByRoute(routeId);
+        console.log('Route stops:', stops);
+        setRouteStops(stops.sort((a, b) => a.sectionNumber - b.sectionNumber));
+      }
+    } catch (error: any) {
+      console.error('Error fetching route stops:', error);
+      // Don't set error state for stops as it's not critical
+    }
+  };
+
   useEffect(() => {
     fetchBuses();
   }, [user?.id]);
 
   useEffect(() => {
     fetchTickets(1);
-  }, [user?.id, selectedBus, selectedDate]);
+  }, [user?.id, selectedBus, selectedDate, selectedFromStop, selectedToStop, selectedPaymentMethod, selectedTripNumber]);
+
+  useEffect(() => {
+    fetchRouteStops(selectedBus);
+    // Clear stop filters when bus changes
+    if (selectedBus) {
+      setSelectedFromStop('');
+      setSelectedToStop('');
+    }
+  }, [selectedBus, buses]);
+
+  const handleBusChange = (busId: string) => {
+    setSelectedBus(busId);
+    // Reset stop-related filters when bus changes
+    setSelectedFromStop('');
+    setSelectedToStop('');
+  };
 
   const getBusDisplay = (busData: any) => {
     if (typeof busData === 'object' && busData) {
@@ -186,13 +255,13 @@ export default function TicketsPage() {
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {/* Bus Filter */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Bus</label>
             <select 
               value={selectedBus}
-              onChange={(e) => setSelectedBus(e.target.value)}
+              onChange={(e) => handleBusChange(e.target.value)}
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">All Buses</option>
@@ -215,12 +284,86 @@ export default function TicketsPage() {
             />
           </div>
 
-          {/* Clear Filters */}
-          <div className="flex items-end">
+          {/* From Stop Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">From Stop</label>
+            <select 
+              value={selectedFromStop}
+              onChange={(e) => setSelectedFromStop(e.target.value)}
+              disabled={!selectedBus || routeStops.length === 0}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            >
+              <option value="">All From Stops</option>
+              {routeStops.map((stop) => (
+                <option key={stop._id} value={stop._id}>
+                  {stop.stopName} (Section {stop.sectionNumber})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* To Stop Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">To Stop</label>
+            <select 
+              value={selectedToStop}
+              onChange={(e) => setSelectedToStop(e.target.value)}
+              disabled={!selectedBus || routeStops.length === 0}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            >
+              <option value="">All To Stops</option>
+              {routeStops.map((stop) => (
+                <option key={stop._id} value={stop._id}>
+                  {stop.stopName} (Section {stop.sectionNumber})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Payment Method Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+            <select 
+              value={selectedPaymentMethod}
+              onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">All Methods</option>
+              <option value="cash">Cash</option>
+              <option value="card">Card</option>
+              <option value="online">Online</option>
+            </select>
+          </div>
+
+          {/* Trip Number Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Trip Number</label>
+            <select 
+              value={selectedTripNumber}
+              onChange={(e) => setSelectedTripNumber(e.target.value)}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">All Trip Numbers</option>
+              {availableTripNumbers.map((tripNumber) => (
+                <option key={tripNumber} value={tripNumber.toString()}>
+                  Trip #{tripNumber}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Clear Filters - spans 2 columns on larger screens */}
+          <div className="flex items-end md:col-span-2 lg:col-span-1">
             <button
               onClick={() => {
                 setSelectedBus('');
                 setSelectedDate(new Date().toISOString().split('T')[0]);
+                setSelectedFromStop('');
+                setSelectedToStop('');
+                setSelectedPaymentMethod('');
+                setSelectedTripNumber('');
+                setRouteStops([]);
+                setAvailableTripNumbers([]);
               }}
               className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-md text-sm font-medium transition-colors"
             >
@@ -228,6 +371,20 @@ export default function TicketsPage() {
             </button>
           </div>
         </div>
+
+        {/* Filter Info */}
+        {(selectedBus || selectedFromStop || selectedToStop || selectedPaymentMethod || selectedTripNumber) && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <p className="text-sm text-blue-800">
+              <span className="font-medium">Active Filters:</span>
+              {selectedBus && <span className="ml-2">Bus: {buses.find(b => b._id === selectedBus)?.busNumber}</span>}
+              {selectedFromStop && <span className="ml-2">From: {routeStops.find(s => s._id === selectedFromStop)?.stopName}</span>}
+              {selectedToStop && <span className="ml-2">To: {routeStops.find(s => s._id === selectedToStop)?.stopName}</span>}
+              {selectedPaymentMethod && <span className="ml-2">Payment: {selectedPaymentMethod.toUpperCase()}</span>}
+              {selectedTripNumber && <span className="ml-2">Trip: #{selectedTripNumber}</span>}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Summary Cards */}
