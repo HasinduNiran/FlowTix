@@ -18,6 +18,10 @@ export default function UsersPage() {
   const [selectedUser, setSelectedUser] = useState<BackendUser | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterRole, setFilterRole] = useState('');
+  
   // Toast state
   const [toast, setToast] = useState<{
     show: boolean;
@@ -144,6 +148,16 @@ export default function UsersPage() {
     showToast('Info', 'Refreshing users...', 'info');
   };
 
+  // Filter users based on search term and role
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = searchTerm === '' || 
+      user.username.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesRole = filterRole === '' || user.role === filterRole;
+    
+    return matchesSearch && matchesRole;
+  });
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
       <div className="container mx-auto p-6 max-w-7xl">
@@ -199,6 +213,66 @@ export default function UsersPage() {
               </div>
             </div>
 
+            {/* Filters Section */}
+            <div className="mb-8 p-6 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex flex-col lg:flex-row gap-4">
+                <div className="relative flex-grow lg:w-80">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search by username..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-12 pr-4 py-3 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
+                  />
+                </div>
+                
+                <div className="relative flex-grow lg:w-80">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <select
+                    value={filterRole}
+                    onChange={(e) => setFilterRole(e.target.value)}
+                    className="pl-12 pr-4 py-3 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white appearance-none cursor-pointer"
+                  >
+                    <option value="">All Roles</option>
+                    <option value="admin">Admin</option>
+                    <option value="owner">Owner</option>
+                    <option value="manager">Manager</option>
+                    <option value="conductor">Conductor</option>
+                  </select>
+                </div>
+
+                {(searchTerm || filterRole) && (
+                  <button
+                    onClick={() => {
+                      setSearchTerm('');
+                      setFilterRole('');
+                    }}
+                    className="px-4 py-3 text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-lg transition-all flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                    Clear Filters
+                  </button>
+                )}
+              </div>
+              
+              <div className="mt-4 text-sm text-gray-600">
+                Showing {filteredUsers.length} of {users.length} users
+                {searchTerm && <span> • Filtered by: "{searchTerm}"</span>}
+                {filterRole && <span> • Role: {filterRole}</span>}
+              </div>
+            </div>
+
             {/* Stats Cards */}
             <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -230,9 +304,9 @@ export default function UsersPage() {
             </div>
 
             {/* Users Table */}
-            {users.length > 0 ? (
+            {filteredUsers.length > 0 ? (
               <UserTable
-                users={users}
+                users={filteredUsers}
                 loading={loading}
                 onEdit={openEditModal}
                 onToggleStatus={handleToggleUserStatus}
@@ -246,19 +320,26 @@ export default function UsersPage() {
                       <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                     </svg>
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-800 mb-2">No Users Found</h3>
+                  <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                    {searchTerm || filterRole ? 'No matching users found' : 'No Users Found'}
+                  </h3>
                   <p className="text-gray-600 mb-4">
-                    No users exist in the system yet. Create the first user to get started.
+                    {searchTerm || filterRole 
+                      ? 'Try adjusting your search criteria or filters to find users.'
+                      : 'No users exist in the system yet. Create the first user to get started.'
+                    }
                   </p>
-                  <button
-                    onClick={() => setShowCreateModal(true)}
-                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 mx-auto"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-                    </svg>
-                    Add User
-                  </button>
+                  {!searchTerm && !filterRole && (
+                    <button
+                      onClick={() => setShowCreateModal(true)}
+                      className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 mx-auto"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                      </svg>
+                      Add User
+                    </button>
+                  )}
                 </div>
               </div>
             ) : null}
