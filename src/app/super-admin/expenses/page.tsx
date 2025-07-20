@@ -3,17 +3,34 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ExpenseTypeService, ExpenseTransactionService, ExpenseType, ExpenseTransaction } from '@/services/expense.service';
+import { BusService, Bus } from '@/services/bus.service';
 import { Button } from '@/components/ui/Button';
+import { Toast } from '@/components/ui/Toast';
 
 export default function ExpensesPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'types' | 'transactions'>('overview');
   const [expenseTypes, setExpenseTypes] = useState<ExpenseType[]>([]);
   const [expenseTransactions, setExpenseTransactions] = useState<ExpenseTransaction[]>([]);
+  const [buses, setBuses] = useState<Bus[]>([]);
+  const [selectedBusId, setSelectedBusId] = useState<string>('');
+  const [busSearchTerm, setBusSearchTerm] = useState<string>('');
+  const [filteredBuses, setFilteredBuses] = useState<Bus[]>([]);
+  const [showBusSuggestions, setShowBusSuggestions] = useState(false);
+  const [selectedBusIndex, setSelectedBusIndex] = useState(-1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBus, setSelectedBus] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  
+  // Toast states
+  const [showToast, setShowToast] = useState(false);
+  const [toastConfig, setToastConfig] = useState({
+    type: 'success' as 'success' | 'error' | 'warning' | 'info',
+    title: '',
+    message: ''
+  });
+  
   const router = useRouter();
 
   useEffect(() => {
@@ -23,12 +40,15 @@ export default function ExpensesPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [typesData, transactionsData] = await Promise.all([
+      const [typesData, transactionsData, busesData] = await Promise.all([
         ExpenseTypeService.getAllExpenseTypes(),
-        ExpenseTransactionService.getAllExpenseTransactions({ limit: 50 })
+        ExpenseTransactionService.getAllExpenseTransactions({ limit: 50 }),
+        BusService.getAllBuses()
       ]);
       setExpenseTypes(typesData);
       setExpenseTransactions(transactionsData);
+      setBuses(busesData);
+      setFilteredBuses(busesData);
       setError(null);
     } catch (err) {
       setError('Failed to fetch expense data. Please try again later.');
@@ -46,9 +66,26 @@ export default function ExpensesPage() {
     try {
       await ExpenseTypeService.deleteExpenseType(typeId);
       setExpenseTypes(expenseTypes.filter(type => type._id !== typeId));
+      
+      // Show success toast
+      setToastConfig({
+        type: 'success',
+        title: 'Expense Type Deleted',
+        message: 'The expense type has been successfully deleted.'
+      });
+      setShowToast(true);
+      
     } catch (err) {
-      setError('Failed to delete expense type. Please try again.');
       console.error('Error deleting expense type:', err);
+      
+      // Show error toast
+      setToastConfig({
+        type: 'error',
+        title: 'Deletion Failed',
+        message: 'Failed to delete expense type. Please try again or contact support if the problem persists.'
+      });
+      setShowToast(true);
+      setError('Failed to delete expense type. Please try again.');
     }
   };
 
@@ -60,9 +97,26 @@ export default function ExpensesPage() {
     try {
       await ExpenseTransactionService.deleteExpenseTransaction(transactionId);
       setExpenseTransactions(expenseTransactions.filter(transaction => transaction._id !== transactionId));
+      
+      // Show success toast
+      setToastConfig({
+        type: 'success',
+        title: 'Transaction Deleted',
+        message: 'The expense transaction has been successfully deleted.'
+      });
+      setShowToast(true);
+      
     } catch (err) {
-      setError('Failed to delete transaction. Please try again.');
       console.error('Error deleting transaction:', err);
+      
+      // Show error toast
+      setToastConfig({
+        type: 'error',
+        title: 'Deletion Failed',
+        message: 'Failed to delete transaction. Please try again or contact support if the problem persists.'
+      });
+      setShowToast(true);
+      setError('Failed to delete transaction. Please try again.');
     }
   };
 
@@ -81,6 +135,97 @@ export default function ExpensesPage() {
     }
     
     return expenseTypeId.expenseName || 'Unknown Type';
+  };
+
+  // Helper function to get bus number for transaction
+  const getBusNumberForTransaction = (transaction: any) => {
+    const expenseType = expenseTypes.find(type => type._id === transaction.expenseTypeId);
+    if (expenseType && typeof expenseType.busId === 'object' && expenseType.busId) {
+      return expenseType.busId.busNumber;
+    }
+    return 'N/A';
+  };
+
+  // Bus handling functions
+  const handleBusSelect = (bus: Bus) => {
+    setSelectedBusId(bus._id);
+    setBusSearchTerm(bus.busNumber);
+    setShowBusSuggestions(false);
+    setSelectedBusIndex(-1);
+  };
+
+  const handleBusKeyDown = (e: React.KeyboardEvent) => {
+    if (!showBusSuggestions || filteredBuses.length === 0) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedBusIndex(prev => 
+          prev < filteredBuses.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedBusIndex(prev => prev > 0 ? prev - 1 : -1);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (selectedBusIndex >= 0) {
+          handleBusSelect(filteredBuses[selectedBusIndex]);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setShowBusSuggestions(false);
+        setSelectedBusIndex(-1);
+        break;
+    }
+  };
+
+  const clearBusSelection = () => {
+    setSelectedBusId('');
+    setBusSearchTerm('');
+    setShowBusSuggestions(false);
+    setSelectedBusIndex(-1);
+  };
+
+  // Filter buses based on search term
+  useEffect(() => {
+    if (busSearchTerm) {
+      const filtered = buses.filter(bus =>
+        bus.busNumber.toLowerCase().includes(busSearchTerm.toLowerCase())
+      );
+      setFilteredBuses(filtered);
+    } else {
+      setFilteredBuses(buses);
+    }
+  }, [busSearchTerm, buses]);
+
+  // Get filtered data based on selected bus
+  const getFilteredExpenseTypes = () => {
+    if (!selectedBusId) return [];
+    return expenseTypes.filter(type => {
+      const busId = typeof type.busId === 'string' ? type.busId : type.busId?._id;
+      return busId === selectedBusId;
+    });
+  };
+
+  const getFilteredTransactions = () => {
+    if (!selectedBusId) return [];
+    const busExpenseTypes = getFilteredExpenseTypes();
+    const busExpenseTypeIds = busExpenseTypes.map(type => type._id);
+    
+    return expenseTransactions.filter(transaction => {
+      const expenseTypeId = typeof transaction.expenseTypeId === 'string' 
+        ? transaction.expenseTypeId 
+        : transaction.expenseTypeId?._id;
+      return busExpenseTypeIds.includes(expenseTypeId || '');
+    });
+  };
+
+  const getFilteredTotalExpenses = () => {
+    const filteredTransactions = getFilteredTransactions();
+    return filteredTransactions.reduce((total, transaction) => total + transaction.amount, 0);
   };
 
   if (loading) {
@@ -200,118 +345,210 @@ export default function ExpensesPage() {
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-200">
-                <div className="flex items-center">
-                  <div className="bg-green-100 p-3 rounded-xl">
-                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                    </svg>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500">Total Expenses</p>
-                    <p className="text-2xl font-bold text-gray-900">Rs. {getTotalExpenses().toLocaleString()}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-200">
-                <div className="flex items-center">
-                  <div className="bg-blue-100 p-3 rounded-xl">
-                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500">Transactions</p>
-                    <p className="text-2xl font-bold text-gray-900">{expenseTransactions.length}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-200">
-                <div className="flex items-center">
-                  <div className="bg-purple-100 p-3 rounded-xl">
-                    <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500">Expense Types</p>
-                    <p className="text-2xl font-bold text-gray-900">{expenseTypes.length}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-200">
-                <div className="flex items-center">
-                  <div className="bg-orange-100 p-3 rounded-xl">
-                    <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500">Average</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      ${expenseTransactions.length > 0 ? (getTotalExpenses() / expenseTransactions.length).toFixed(2) : '0.00'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Recent Transactions */}
+            {/* Bus Selection */}
             <div className="bg-white shadow-lg rounded-2xl border border-gray-200 p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-gray-900">Recent Transactions</h3>
-                <Button
-                  onClick={() => setActiveTab('transactions')}
-                  variant="outline"
-                  className="text-purple-600 border-purple-200 hover:bg-purple-50"
-                >
-                  View All
-                </Button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Date
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Expense Type
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Amount
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Notes
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {expenseTransactions.slice(0, 5).map((transaction) => (
-                      <tr key={transaction._id} className="hover:bg-gray-50 transition-colors duration-200">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {new Date(transaction.date).toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {getExpenseTypeDisplay(transaction.expenseTypeId)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                          Rs. {transaction.amount.toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
-                          {transaction.notes || 'No notes'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
+                <h3 className="text-lg font-semibold text-gray-900">Select Bus for Overview</h3>
+                <div className="flex items-center space-x-3">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={busSearchTerm}
+                      onChange={(e) => {
+                        setBusSearchTerm(e.target.value);
+                        setShowBusSuggestions(true);
+                        setSelectedBusIndex(-1);
+                      }}
+                      onKeyDown={handleBusKeyDown}
+                      onFocus={() => setShowBusSuggestions(true)}
+                      onBlur={() => {
+                        setTimeout(() => setShowBusSuggestions(false), 200);
+                      }}
+                      placeholder="Type bus number..."
+                      className="w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+                    />
+
+                    {/* Bus suggestions dropdown */}
+                    {showBusSuggestions && filteredBuses.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {filteredBuses.map((bus, index) => (
+                          <div
+                            key={bus._id}
+                            className={`px-4 py-2 cursor-pointer transition-colors ${
+                              index === selectedBusIndex
+                                ? 'bg-purple-50 text-purple-800'
+                                : 'hover:bg-gray-50'
+                            }`}
+                            onClick={() => handleBusSelect(bus)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-900">{bus.busNumber}</div>
+                                <div className="text-sm text-gray-500">
+                                  {bus.busName} • Capacity: {bus.seatCapacity}
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span className={`px-2 py-1 text-xs rounded-full ${
+                                  bus.status === 'active' 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : 'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {bus.status}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* No buses found */}
+                    {showBusSuggestions && busSearchTerm && filteredBuses.length === 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-gray-500">
+                        No buses found matching "{busSearchTerm}"
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedBusId && (
+                    <button
+                      onClick={clearBusSelection}
+                      className="px-4 py-2 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg transition-colors"
+                    >
+                      Clear Selection
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
+
+            {/* Statistics Cards - Show only when bus is selected */}
+            {selectedBusId ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-200">
+                  <div className="flex items-center">
+                    <div className="bg-green-100 p-3 rounded-xl">
+                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                      </svg>
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-500">Total Expenses</p>
+                      <p className="text-2xl font-bold text-gray-900">Rs. {getFilteredTotalExpenses().toLocaleString()}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-200">
+                  <div className="flex items-center">
+                    <div className="bg-blue-100 p-3 rounded-xl">
+                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-500">Transactions</p>
+                      <p className="text-2xl font-bold text-gray-900">{getFilteredTransactions().length}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-200">
+                  <div className="flex items-center">
+                    <div className="bg-purple-100 p-3 rounded-xl">
+                      <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-500">Expense Types</p>
+                      <p className="text-2xl font-bold text-gray-900">{getFilteredExpenseTypes().length}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-200">
+                  <div className="flex items-center">
+                    <div className="bg-orange-100 p-3 rounded-xl">
+                      <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                      </svg>
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-500">Average</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        Rs. {getFilteredTransactions().length > 0 ? (getFilteredTotalExpenses() / getFilteredTransactions().length).toFixed(2) : '0.00'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white shadow-lg rounded-2xl border border-gray-200 p-12 text-center">
+                <div className="bg-gray-100 p-4 rounded-2xl mx-auto w-fit mb-4">
+                  <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Select a Bus to View Overview</h3>
+                <p className="text-gray-600">Choose a bus from the dropdown above to see detailed expense statistics and recent transactions.</p>
+              </div>
+            )}
+
+            {/* Recent Transactions - Show only when bus is selected */}
+            {selectedBusId && (
+              <div className="bg-white shadow-lg rounded-2xl border border-gray-200 p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-bold text-gray-900">Recent Transactions for {busSearchTerm}</h3>
+                  <Button
+                    onClick={() => setActiveTab('transactions')}
+                    variant="outline"
+                    className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                  >
+                    View All
+                  </Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Date
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Expense Type
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Amount
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Notes
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {getFilteredTransactions().slice(0, 5).map((transaction) => (
+                        <tr key={transaction._id} className="hover:bg-gray-50 transition-colors duration-200">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {new Date(transaction.date).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {getExpenseTypeDisplay(transaction.expenseTypeId)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
+                            Rs. {transaction.amount.toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
+                            {transaction.notes || 'No notes'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -321,7 +558,58 @@ export default function ExpensesPage() {
             <div className="p-6 border-b border-gray-200">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
                 <h3 className="text-xl font-bold text-gray-900">Expense Types</h3>
-                <div className="flex space-x-3">
+                <div className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-3">
+                  {/* Bus selection */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={busSearchTerm}
+                      onChange={(e) => {
+                        setBusSearchTerm(e.target.value);
+                        setShowBusSuggestions(true);
+                        setSelectedBusIndex(-1);
+                      }}
+                      onKeyDown={handleBusKeyDown}
+                      onFocus={() => setShowBusSuggestions(true)}
+                      onBlur={() => {
+                        setTimeout(() => setShowBusSuggestions(false), 200);
+                      }}
+                      placeholder="Filter by bus number..."
+                      className="w-48 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+                    />
+
+                    {/* Bus suggestions dropdown */}
+                    {showBusSuggestions && filteredBuses.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {filteredBuses.map((bus, index) => (
+                          <div
+                            key={bus._id}
+                            className={`px-4 py-2 cursor-pointer transition-colors ${
+                              index === selectedBusIndex
+                                ? 'bg-purple-50 text-purple-800'
+                                : 'hover:bg-gray-50'
+                            }`}
+                            onClick={() => handleBusSelect(bus)}
+                          >
+                            <div className="font-medium text-gray-900">{bus.busNumber}</div>
+                            <div className="text-sm text-gray-500">{bus.busName}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {selectedBusId && (
+                      <button
+                        onClick={clearBusSelection}
+                        className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+
                   <input
                     type="text"
                     placeholder="Search expense types..."
@@ -353,22 +641,17 @@ export default function ExpensesPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Bus
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Created
-                    </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {expenseTypes.filter(type => 
-                    type.expenseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    type.description.toLowerCase().includes(searchTerm.toLowerCase())
-                  ).map((type) => (
+                  {(selectedBusId ? getFilteredExpenseTypes() : expenseTypes)
+                    .filter(type => 
+                      type.expenseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      type.description.toLowerCase().includes(searchTerm.toLowerCase())
+                    ).map((type) => (
                     <tr key={type._id} className="hover:bg-gray-50 transition-colors duration-200">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
@@ -378,18 +661,6 @@ export default function ExpensesPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {typeof type.busId === 'object' && type.busId ? type.busId.busNumber : 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          type.isActive 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {type.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {new Date(type.createdAt).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex justify-end space-x-2">
@@ -437,7 +708,58 @@ export default function ExpensesPage() {
             <div className="p-6 border-b border-gray-200">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
                 <h3 className="text-xl font-bold text-gray-900">Expense Transactions</h3>
-                <div className="flex space-x-3">
+                <div className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-3">
+                  {/* Bus selection */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={busSearchTerm}
+                      onChange={(e) => {
+                        setBusSearchTerm(e.target.value);
+                        setShowBusSuggestions(true);
+                        setSelectedBusIndex(-1);
+                      }}
+                      onKeyDown={handleBusKeyDown}
+                      onFocus={() => setShowBusSuggestions(true)}
+                      onBlur={() => {
+                        setTimeout(() => setShowBusSuggestions(false), 200);
+                      }}
+                      placeholder="Filter by bus number..."
+                      className="w-48 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+                    />
+
+                    {/* Bus suggestions dropdown */}
+                    {showBusSuggestions && filteredBuses.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {filteredBuses.map((bus, index) => (
+                          <div
+                            key={bus._id}
+                            className={`px-4 py-2 cursor-pointer transition-colors ${
+                              index === selectedBusIndex
+                                ? 'bg-purple-50 text-purple-800'
+                                : 'hover:bg-gray-50'
+                            }`}
+                            onClick={() => handleBusSelect(bus)}
+                          >
+                            <div className="font-medium text-gray-900">{bus.busNumber}</div>
+                            <div className="text-sm text-gray-500">{bus.busName}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {selectedBusId && (
+                      <button
+                        onClick={clearBusSelection}
+                        className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+
                   <input
                     type="text"
                     placeholder="Search transactions..."
@@ -475,19 +797,17 @@ export default function ExpensesPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Notes
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {expenseTransactions.filter(transaction => 
-                    getExpenseTypeDisplay(transaction.expenseTypeId).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    (transaction.notes && transaction.notes.toLowerCase().includes(searchTerm.toLowerCase()))
-                  ).map((transaction) => (
+                  {(selectedBusId ? getFilteredTransactions() : expenseTransactions)
+                    .filter(transaction => 
+                      getExpenseTypeDisplay(transaction.expenseTypeId).toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      (transaction.notes && transaction.notes.toLowerCase().includes(searchTerm.toLowerCase()))
+                    ).map((transaction) => (
                     <tr key={transaction._id} className="hover:bg-gray-50 transition-colors duration-200">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {new Date(transaction.date).toLocaleDateString()}
@@ -500,15 +820,6 @@ export default function ExpensesPage() {
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
                         {transaction.notes || 'No notes'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          transaction.isActive 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {transaction.isActive ? 'Active' : 'Inactive'}
-                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex justify-end space-x-2">
@@ -583,6 +894,16 @@ export default function ExpensesPage() {
             </Button>
           </div>
         )}
+        
+        {/* Toast Notification */}
+        <Toast
+          isOpen={showToast}
+          onClose={() => setShowToast(false)}
+          title={toastConfig.title}
+          message={toastConfig.message}
+          type={toastConfig.type}
+          duration={toastConfig.type === 'success' ? 3000 : 5000}
+        />
       </div>
     </div>
   );
