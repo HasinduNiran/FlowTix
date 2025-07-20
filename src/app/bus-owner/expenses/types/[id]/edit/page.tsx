@@ -26,6 +26,12 @@ export default function EditOwnerExpenseTypePage() {
     message: ''
   });
 
+  // Autocomplete states for bus selection
+  const [busSearchQuery, setBusSearchQuery] = useState('');
+  const [showBusDropdown, setShowBusDropdown] = useState(false);
+  const [selectedBus, setSelectedBus] = useState<Bus | null>(null);
+  const [filteredBuses, setFilteredBuses] = useState<Bus[]>([]);
+
   const router = useRouter();
   const params = useParams();
   const { user } = useAuth();
@@ -36,6 +42,32 @@ export default function EditOwnerExpenseTypePage() {
       Promise.all([fetchExpenseType(), fetchOwnerBuses()]);
     }
   }, [user, id]);
+
+  // Filter buses based on search query
+  useEffect(() => {
+    if (buses.length > 0) {
+      if (busSearchQuery.trim() === '') {
+        setFilteredBuses(buses);
+      } else {
+        const filtered = buses.filter(bus =>
+          bus.busNumber.toLowerCase().includes(busSearchQuery.toLowerCase()) ||
+          bus.busName.toLowerCase().includes(busSearchQuery.toLowerCase())
+        );
+        setFilteredBuses(filtered);
+      }
+    }
+  }, [buses, busSearchQuery]);
+
+  // Set initial bus search query when form data and buses are loaded
+  useEffect(() => {
+    if (formData.busId && buses.length > 0) {
+      const currentBus = buses.find(bus => bus._id === formData.busId);
+      if (currentBus) {
+        setSelectedBus(currentBus);
+        setBusSearchQuery(`${currentBus.busNumber} - ${currentBus.busName}`);
+      }
+    }
+  }, [formData.busId, buses]);
 
   const fetchExpenseType = async () => {
     try {
@@ -89,6 +121,40 @@ export default function EditOwnerExpenseTypePage() {
     }
   };
 
+  // Handle bus search input changes
+  const handleBusSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setBusSearchQuery(value);
+    setShowBusDropdown(true);
+    
+    // Clear selection if user is typing
+    if (selectedBus && value !== `${selectedBus.busNumber} - ${selectedBus.busName}`) {
+      setSelectedBus(null);
+      setFormData(prev => ({ ...prev, busId: '' }));
+    }
+  };
+
+  // Handle bus selection from dropdown
+  const handleBusSelect = (bus: Bus) => {
+    setSelectedBus(bus);
+    setBusSearchQuery(`${bus.busNumber} - ${bus.busName}`);
+    setShowBusDropdown(false);
+    setFormData(prev => ({ ...prev, busId: bus._id }));
+  };
+
+  // Handle input focus
+  const handleBusInputFocus = () => {
+    setShowBusDropdown(true);
+  };
+
+  // Handle clicking outside to close dropdown
+  const handleBusInputBlur = () => {
+    // Delay hiding dropdown to allow clicking on items
+    setTimeout(() => {
+      setShowBusDropdown(false);
+    }, 200);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -102,11 +168,11 @@ export default function EditOwnerExpenseTypePage() {
       return;
     }
 
-    if (!formData.busId) {
+    if (!formData.busId || !selectedBus) {
       setToastConfig({
         type: 'error',
         title: 'Validation Error',
-        message: 'Please select a bus for this expense type.'
+        message: 'Please select a bus from the dropdown for this expense type.'
       });
       setShowToast(true);
       return;
@@ -299,25 +365,71 @@ export default function EditOwnerExpenseTypePage() {
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="busId" className="block text-sm font-semibold text-gray-700 mb-3">
+                <div className="relative">
+                  <label htmlFor="busSearch" className="block text-sm font-semibold text-gray-700 mb-3">
                     Associated Bus *
                   </label>
-                  <select
-                    id="busId"
-                    name="busId"
-                    value={formData.busId}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white/80 backdrop-blur-sm"
-                    required
-                  >
-                    <option value="">Select a bus</option>
-                    {buses.map((bus) => (
-                      <option key={bus._id} value={bus._id}>
-                        {bus.busNumber} - {bus.busName}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      id="busSearch"
+                      name="busSearch"
+                      value={busSearchQuery}
+                      onChange={handleBusSearchChange}
+                      onFocus={handleBusInputFocus}
+                      onBlur={handleBusInputBlur}
+                      placeholder="Type bus number or name to search..."
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white/80 backdrop-blur-sm pr-10"
+                      autoComplete="off"
+                      required
+                    />
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    
+                    {/* Dropdown */}
+                    {showBusDropdown && filteredBuses.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                        {filteredBuses.map((bus) => (
+                          <div
+                            key={bus._id}
+                            onClick={() => handleBusSelect(bus)}
+                            className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                          >
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <div className="font-medium text-gray-900">
+                                  {bus.busNumber} - {bus.busName}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {bus.seatCapacity} seats
+                                </div>
+                              </div>
+                              {selectedBus?._id === bus._id && (
+                                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* No results message */}
+                    {showBusDropdown && busSearchQuery.trim() !== '' && filteredBuses.length === 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-xl shadow-lg">
+                        <div className="px-4 py-3 text-gray-500 text-center">
+                          No buses found matching "{busSearchQuery}"
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <p className="mt-2 text-sm text-gray-500">
+                    Type bus number or name to search and select the associated bus
+                  </p>
                 </div>
               </div>
 

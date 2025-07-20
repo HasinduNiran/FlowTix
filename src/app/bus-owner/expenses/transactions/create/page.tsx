@@ -3,28 +3,33 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { Toast } from '@/components/ui/Toast';
-import { OwnerExpenseTransactionService, OwnerExpenseTypeService, CreateOwnerExpenseTransactionData, OwnerExpenseType } from '@/services/ownerExpense.service';
+import { OwnerExpenseTransactionService, OwnerExpenseTypeService, OwnerExpenseType, CreateOwnerExpenseTransactionData } from '@/services/ownerExpense.service';
 import { BusService, Bus } from '@/services/bus.service';
 import { useAuth } from '@/context/AuthContext';
 
-export default function CreateOwnerExpenseTransactionPage() {
+export default function CreateTransactionPage() {
   const [formData, setFormData] = useState<CreateOwnerExpenseTransactionData>({
     expenseTypeId: '',
     amount: 0,
-    date: new Date().toISOString().split('T')[0], // Today's date
-    uploadedBill: '',
-    notes: '',
-    isActive: true,
+    date: new Date().toISOString().split('T')[0], // Today's date as default
+    notes: ''
   });
-
-  const [ownerBuses, setOwnerBuses] = useState<Bus[]>([]);
+  
   const [expenseTypes, setExpenseTypes] = useState<OwnerExpenseType[]>([]);
-  const [filteredExpenseTypes, setFilteredExpenseTypes] = useState<OwnerExpenseType[]>([]);
-  const [selectedBusId, setSelectedBusId] = useState<string>('');
+  const [ownerBuses, setOwnerBuses] = useState<Bus[]>([]);
   const [loading, setLoading] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Autocomplete states for expense type selection
+  const [expenseTypeSearchQuery, setExpenseTypeSearchQuery] = useState('');
+  const [showExpenseTypeDropdown, setShowExpenseTypeDropdown] = useState(false);
+  const [selectedExpenseType, setSelectedExpenseType] = useState<OwnerExpenseType | null>(null);
+  const [filteredExpenseTypes, setFilteredExpenseTypes] = useState<OwnerExpenseType[]>([]);
+  
+  // Toast states
   const [showToast, setShowToast] = useState(false);
   const [toastConfig, setToastConfig] = useState({
     type: 'success' as 'success' | 'error' | 'warning' | 'info',
@@ -41,35 +46,31 @@ export default function CreateOwnerExpenseTransactionPage() {
     }
   }, [user]);
 
+  // Filter expense types based on search query
   useEffect(() => {
-    // Filter expense types based on selected bus
-    if (selectedBusId) {
-      const filtered = expenseTypes.filter(type => {
-        const busId = typeof type.busId === 'string' ? type.busId : type.busId?._id;
-        return busId === selectedBusId && type.isActive;
-      });
-      setFilteredExpenseTypes(filtered);
-      
-      // Reset expense type selection if current selection is not valid for the new bus
-      if (formData.expenseTypeId && !filtered.find(type => type._id === formData.expenseTypeId)) {
-        setFormData(prev => ({ ...prev, expenseTypeId: '' }));
+    if (expenseTypes.length > 0) {
+      if (expenseTypeSearchQuery.trim() === '') {
+        setFilteredExpenseTypes(expenseTypes);
+      } else {
+        const filtered = expenseTypes.filter(type =>
+          type.expenseName.toLowerCase().includes(expenseTypeSearchQuery.toLowerCase()) ||
+          (type.busId && typeof type.busId === 'object' && 
+           type.busId.busNumber.toLowerCase().includes(expenseTypeSearchQuery.toLowerCase()))
+        );
+        setFilteredExpenseTypes(filtered);
       }
-    } else {
-      setFilteredExpenseTypes(expenseTypes.filter(type => type.isActive));
     }
-  }, [selectedBusId, expenseTypes, formData.expenseTypeId]);
+  }, [expenseTypes, expenseTypeSearchQuery]);
 
   const fetchOwnerData = async () => {
     try {
       setIsLoadingData(true);
-      const [buses, types] = await Promise.all([
-        BusService.getBusesByOwner(user!.id),
-        OwnerExpenseTypeService.getOwnerExpenseTypes({ isActive: true })
+      const [expenseTypesData, busesData] = await Promise.all([
+        OwnerExpenseTypeService.getOwnerExpenseTypes(),
+        BusService.getBusesByOwner(user!.id)
       ]);
-      
-      setOwnerBuses(buses);
-      setExpenseTypes(types);
-      setFilteredExpenseTypes(types.filter(type => type.isActive));
+      setExpenseTypes(expenseTypesData);
+      setOwnerBuses(busesData);
       setError(null);
     } catch (err) {
       setError('Failed to fetch your data. Please try again later.');
@@ -79,57 +80,71 @@ export default function CreateOwnerExpenseTransactionPage() {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
+  // Handle expense type search input changes
+  const handleExpenseTypeSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setExpenseTypeSearchQuery(value);
+    setShowExpenseTypeDropdown(true);
     
-    if (type === 'checkbox') {
-      const checkbox = e.target as HTMLInputElement;
-      setFormData(prev => ({
-        ...prev,
-        [name]: checkbox.checked
-      }));
-    } else if (name === 'amount') {
-      const numericValue = parseFloat(value) || 0;
-      setFormData(prev => ({
-        ...prev,
-        [name]: numericValue
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
+    // Clear selection if user is typing
+    if (selectedExpenseType) {
+      const busInfo = typeof selectedExpenseType.busId === 'object' 
+        ? ` (${selectedExpenseType.busId.busNumber})` 
+        : '';
+      const expectedValue = `${selectedExpenseType.expenseName}${busInfo}`;
+      if (value !== expectedValue) {
+        setSelectedExpenseType(null);
+        setFormData(prev => ({ ...prev, expenseTypeId: '' }));
+      }
     }
   };
 
-  const handleBusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const busId = e.target.value;
-    setSelectedBusId(busId);
+  // Handle expense type selection from dropdown
+  const handleExpenseTypeSelect = (expenseType: OwnerExpenseType) => {
+    setSelectedExpenseType(expenseType);
+    const busInfo = typeof expenseType.busId === 'object' 
+      ? ` (${expenseType.busId.busNumber})` 
+      : '';
+    setExpenseTypeSearchQuery(`${expenseType.expenseName}${busInfo}`);
+    setShowExpenseTypeDropdown(false);
+    setFormData(prev => ({ ...prev, expenseTypeId: expenseType._id }));
+  };
+
+  // Handle input focus
+  const handleExpenseTypeInputFocus = () => {
+    setShowExpenseTypeDropdown(true);
+  };
+
+  // Handle clicking outside to close dropdown
+  const handleExpenseTypeInputBlur = () => {
+    // Delay hiding dropdown to allow clicking on items
+    setTimeout(() => {
+      setShowExpenseTypeDropdown(false);
+    }, 200);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'number' ? parseFloat(value) || 0 : value
+    }));
   };
 
   const validateForm = (): boolean => {
-    if (!formData.expenseTypeId) {
-      setError('Please select an expense type');
+    if (!formData.expenseTypeId || !selectedExpenseType) {
+      setError('Please select an expense type from the dropdown');
       return false;
     }
-    if (formData.amount <= 0) {
-      setError('Please enter a valid amount greater than 0');
+    if (!formData.amount || formData.amount <= 0) {
+      setError('Please enter a valid amount');
       return false;
     }
     if (!formData.date) {
-      setError('Please select a date');
+      setError('Please select a transaction date');
       return false;
     }
-    
-    const selectedDate = new Date(formData.date);
-    const today = new Date();
-    today.setHours(23, 59, 59, 999); // End of today
-    
-    if (selectedDate > today) {
-      setError('Transaction date cannot be in the future');
-      return false;
-    }
-    
     return true;
   };
 
@@ -146,13 +161,10 @@ export default function CreateOwnerExpenseTransactionPage() {
     try {
       await OwnerExpenseTransactionService.createExpenseTransaction(formData);
       
-      const expenseType = expenseTypes.find(type => type._id === formData.expenseTypeId);
-      const expenseTypeName = expenseType?.expenseName || 'Expense';
-      
       setToastConfig({
         type: 'success',
         title: 'Transaction Created',
-        message: `${expenseTypeName} transaction of Rs. ${formData.amount.toLocaleString()} has been recorded successfully.`
+        message: `Transaction for Rs. ${formData.amount.toLocaleString()} has been created successfully.`
       });
       setShowToast(true);
 
@@ -162,11 +174,11 @@ export default function CreateOwnerExpenseTransactionPage() {
       }, 1500);
 
     } catch (err: any) {
-      console.error('Error creating expense transaction:', err);
+      console.error('Error creating transaction:', err);
       
       const errorMessage = err?.response?.data?.message || 
                           err?.message || 
-                          'Failed to create expense transaction. Please try again.';
+                          'Failed to create transaction. Please try again.';
       
       setToastConfig({
         type: 'error',
@@ -191,7 +203,7 @@ export default function CreateOwnerExpenseTransactionPage() {
           <div className="flex justify-center items-center h-96">
             <div className="text-center">
               <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600 text-lg">Loading your data...</p>
+              <p className="text-gray-600 text-lg">Loading your expense data...</p>
             </div>
           </div>
         </div>
@@ -233,12 +245,12 @@ export default function CreateOwnerExpenseTransactionPage() {
             <div className="flex items-center">
               <div className="bg-gradient-to-br from-green-100 to-emerald-100 p-4 rounded-2xl mr-6">
                 <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Create New Expense Transaction</h1>
-                <p className="text-gray-600">Record a new expense for one of your buses</p>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">Create New Transaction</h1>
+                <p className="text-gray-600">Add a new expense transaction to your records</p>
               </div>
             </div>
           </div>
@@ -264,7 +276,7 @@ export default function CreateOwnerExpenseTransactionPage() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">No Expense Types Found</h3>
-                <p className="text-gray-600 mb-6">You need to create at least one expense type before adding transactions.</p>
+                <p className="text-gray-600 mb-6">You need to have at least one expense type to create transactions. Please add an expense type first.</p>
                 <Button
                   onClick={() => router.push('/bus-owner/expenses/types/create')}
                   className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
@@ -274,160 +286,167 @@ export default function CreateOwnerExpenseTransactionPage() {
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* Bus Selection (Optional Filter) */}
-                  <div className="md:col-span-2">
-                    <label htmlFor="busFilter" className="block text-sm font-semibold text-gray-900 mb-3">
-                      Filter by Bus (Optional)
-                    </label>
-                    <select
-                      id="busFilter"
-                      value={selectedBusId}
-                      onChange={handleBusChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-gray-50 text-gray-900"
-                    >
-                      <option value="">All buses - Show all expense types</option>
-                      {ownerBuses.map((bus) => (
-                        <option key={bus._id} value={bus._id}>
-                          {bus.busNumber} - {bus.busName}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="mt-2 text-sm text-gray-500">
-                      Select a specific bus to filter expense types, or leave blank to see all
-                    </p>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Left Column */}
+                  <div className="space-y-6">
+                    {/* Expense Type with Autocomplete */}
+                    <div className="relative">
+                      <label htmlFor="expenseTypeSearch" className="block text-sm font-semibold text-gray-900 mb-3">
+                        Expense Type <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          id="expenseTypeSearch"
+                          name="expenseTypeSearch"
+                          value={expenseTypeSearchQuery}
+                          onChange={handleExpenseTypeSearchChange}
+                          onFocus={handleExpenseTypeInputFocus}
+                          onBlur={handleExpenseTypeInputBlur}
+                          placeholder="Type expense type or bus number to search..."
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors pr-10"
+                          autoComplete="off"
+                          required
+                        />
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                        </div>
+                        
+                        {/* Dropdown */}
+                        {showExpenseTypeDropdown && filteredExpenseTypes.length > 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                            {filteredExpenseTypes.map((expenseType) => (
+                              <div
+                                key={expenseType._id}
+                                onClick={() => handleExpenseTypeSelect(expenseType)}
+                                className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                              >
+                                <div className="flex justify-between items-center">
+                                  <div>
+                                    <div className="font-medium text-gray-900">
+                                      {expenseType.expenseName}
+                                    </div>
+                                    <div className="text-sm text-gray-500">
+                                      {typeof expenseType.busId === 'object' && expenseType.busId
+                                        ? `${expenseType.busId.busNumber} - ${expenseType.busId.busName}`
+                                        : 'Unknown Bus'
+                                      }
+                                    </div>
+                                  </div>
+                                  {selectedExpenseType?._id === expenseType._id && (
+                                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {/* No results message */}
+                        {showExpenseTypeDropdown && expenseTypeSearchQuery.trim() !== '' && filteredExpenseTypes.length === 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-xl shadow-lg">
+                            <div className="px-4 py-3 text-gray-500 text-center">
+                              No expense types found matching "{expenseTypeSearchQuery}"
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <p className="mt-2 text-sm text-gray-500">
+                        Type expense type name or bus number to search and select
+                      </p>
+                    </div>
+
+                    {/* Amount */}
+                    <div>
+                      <label htmlFor="amount" className="block text-sm font-semibold text-gray-900 mb-3">
+                        Amount (Rs.) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        id="amount"
+                        name="amount"
+                        value={formData.amount || ''}
+                        onChange={handleInputChange}
+                        required
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                      />
+                      <p className="mt-2 text-sm text-gray-500">
+                        Enter the transaction amount in Pakistani Rupees
+                      </p>
+                    </div>
+
+                    {/* Date */}
+                    <div>
+                      <label htmlFor="date" className="block text-sm font-semibold text-gray-900 mb-3">
+                        Transaction Date <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        id="date"
+                        name="date"
+                        value={formData.date}
+                        onChange={handleInputChange}
+                        required
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                      />
+                      <p className="mt-2 text-sm text-gray-500">
+                        Select the date when this expense occurred
+                      </p>
+                    </div>
                   </div>
 
-                  {/* Expense Type Selection */}
-                  <div className="md:col-span-2">
-                    <label htmlFor="expenseTypeId" className="block text-sm font-semibold text-gray-900 mb-3">
-                      Expense Type <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      id="expenseTypeId"
-                      name="expenseTypeId"
-                      value={formData.expenseTypeId}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                    >
-                      <option value="">Choose an expense type...</option>
-                      {filteredExpenseTypes.map((type) => (
-                        <option key={type._id} value={type._id}>
-                          {type.expenseName} - {typeof type.busId === 'object' ? type.busId?.busNumber : 'N/A'}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="mt-2 text-sm text-gray-500">
-                      {filteredExpenseTypes.length === 0 
-                        ? (selectedBusId ? 'No expense types found for the selected bus' : 'No active expense types available')
-                        : `${filteredExpenseTypes.length} expense type(s) available`
-                      }
-                    </p>
-                  </div>
+                  {/* Right Column */}
+                  <div className="space-y-6">
+                    {/* Notes */}
+                    <div>
+                      <label htmlFor="notes" className="block text-sm font-semibold text-gray-900 mb-3">
+                        Notes
+                      </label>
+                      <textarea
+                        id="notes"
+                        name="notes"
+                        value={formData.notes}
+                        onChange={handleInputChange}
+                        rows={6}
+                        maxLength={500}
+                        placeholder="Add any additional notes about this transaction..."
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none"
+                      />
+                      <p className="mt-2 text-sm text-gray-500">
+                        Optional details about the transaction ({formData.notes?.length || 0}/500 characters)
+                      </p>
+                    </div>
 
-                  {/* Amount */}
-                  <div>
-                    <label htmlFor="amount" className="block text-sm font-semibold text-gray-900 mb-3">
-                      Amount (Rs.) <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      id="amount"
-                      name="amount"
-                      value={formData.amount || ''}
-                      onChange={handleInputChange}
-                      required
-                      min="0.01"
-                      step="0.01"
-                      placeholder="0.00"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                    />
-                    <p className="mt-2 text-sm text-gray-500">
-                      Enter the expense amount in Sri Lankan Rupees
-                    </p>
-                  </div>
-
-                  {/* Date */}
-                  <div>
-                    <label htmlFor="date" className="block text-sm font-semibold text-gray-900 mb-3">
-                      Transaction Date <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      id="date"
-                      name="date"
-                      value={formData.date}
-                      onChange={handleInputChange}
-                      required
-                      max={new Date().toISOString().split('T')[0]} // Can't be in the future
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                    />
-                    <p className="mt-2 text-sm text-gray-500">
-                      When did this expense occur?
-                    </p>
-                  </div>
-
-                  {/* Bill Upload */}
-                  <div className="md:col-span-2">
-                    <label htmlFor="uploadedBill" className="block text-sm font-semibold text-gray-900 mb-3">
-                      Bill/Receipt Reference (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      id="uploadedBill"
-                      name="uploadedBill"
-                      value={formData.uploadedBill}
-                      onChange={handleInputChange}
-                      maxLength={200}
-                      placeholder="Bill number, receipt reference, or file name..."
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                    />
-                    <p className="mt-2 text-sm text-gray-500">
-                      Reference to any bill, receipt, or document related to this expense
-                    </p>
-                  </div>
-                </div>
-
-                {/* Notes */}
-                <div>
-                  <label htmlFor="notes" className="block text-sm font-semibold text-gray-900 mb-3">
-                    Notes (Optional)
-                  </label>
-                  <textarea
-                    id="notes"
-                    name="notes"
-                    value={formData.notes}
-                    onChange={handleInputChange}
-                    rows={4}
-                    maxLength={500}
-                    placeholder="Additional details about this expense..."
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none"
-                  />
-                  <p className="mt-2 text-sm text-gray-500">
-                    Add any additional information about this expense ({(formData.notes || '').length}/500 characters)
-                  </p>
-                </div>
-
-                {/* Active Status */}
-                <div className="flex items-start space-x-3">
-                  <div className="flex items-center h-5">
-                    <input
-                      id="isActive"
-                      name="isActive"
-                      type="checkbox"
-                      checked={formData.isActive}
-                      onChange={handleInputChange}
-                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                    />
-                  </div>
-                  <div className="text-sm">
-                    <label htmlFor="isActive" className="font-medium text-gray-900">
-                      Active Transaction
-                    </label>
-                    <p className="text-gray-500">
-                      Active transactions are included in reports and calculations
-                    </p>
+                    {/* Selected Expense Type Info */}
+                    {selectedExpenseType && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                        <h4 className="text-sm font-semibold text-blue-900 mb-2">Selected Expense Type</h4>
+                        <div className="space-y-1">
+                          <p className="text-sm text-blue-800">
+                            <span className="font-medium">Type:</span> {selectedExpenseType.expenseName}
+                          </p>
+                          <p className="text-sm text-blue-800">
+                            <span className="font-medium">Bus:</span> {
+                              typeof selectedExpenseType.busId === 'object' && selectedExpenseType.busId
+                                ? `${selectedExpenseType.busId.busNumber} - ${selectedExpenseType.busId.busName}`
+                                : 'Unknown Bus'
+                            }
+                          </p>
+                          {selectedExpenseType.description && (
+                            <p className="text-sm text-blue-700 mt-2">
+                              <span className="font-medium">Description:</span> {selectedExpenseType.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -447,7 +466,7 @@ export default function CreateOwnerExpenseTransactionPage() {
                   </Button>
                   <Button
                     type="submit"
-                    disabled={loading || filteredExpenseTypes.length === 0}
+                    disabled={loading}
                     className="w-full sm:w-auto bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg hover:shadow-xl transition-all duration-200"
                   >
                     {loading ? (
