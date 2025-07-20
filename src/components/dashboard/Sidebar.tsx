@@ -33,12 +33,14 @@ export default function Sidebar({ role }: SidebarProps) {
 
   const busOwnerLinks = [
     { name: 'Dashboard', href: '/bus-owner/dashboard', icon: '📊' },
+    { name: 'Users', href: '/bus-owner/users', icon: '👥' },
     { name: 'Buses', href: '/bus-owner/buses', icon: '🚌' },
-    { name: 'Tickets', href: '/bus-owner/tickets', icon: '🎫' },
+    { name: 'Route Sections', href: '/bus-owner/route-sections', icon: '🔗' },
     { name: 'Trips', href: '/bus-owner/trips', icon: '🚍' },
-    { name: 'Expenses', href: '/bus-owner/expenses', icon: '💰' },
-    { name: 'Staff', href: '/bus-owner/staff', icon: '👥' },
-    { name: 'Reports', href: '/bus-owner/reports', icon: '📝' },
+    { name: 'Tickets', href: '/bus-owner/tickets', icon: '🎫' },
+    { name: 'Day End', href: '/bus-owner/day-end', icon: '🌅' },
+    { name: 'Monthly Fees', href: '/bus-owner/monthly-fees', icon: '�' },
+    { name: 'Expenses', href: '/bus-owner/expenses', icon: '�' },
     { name: 'Settings', href: '/bus-owner/settings', icon: '⚙️' },
   ];
 
