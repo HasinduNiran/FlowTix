@@ -83,5 +83,25 @@ export const BusService = {
       console.error(`Error deleting bus with id ${id}:`, error);
       throw error;
     }
+  },
+
+  async getBusesByOwner(ownerId: string): Promise<Bus[]> {
+    try {
+      const response = await api.get(`/buses/owner/${ownerId}`);
+      return response.data.data;
+    } catch (error) {
+      console.error(`Error fetching buses for owner ${ownerId}:`, error);
+      throw error;
+    }
+  },
+
+  async updateBusStatus(busId: string, status: 'active' | 'inactive'): Promise<Bus> {
+    try {
+      const response = await api.put(`/buses/${busId}`, { status });
+      return response.data.data;
+    } catch (error) {
+      console.error(`Error updating bus status for bus ${busId}:`, error);
+      throw error;
+    }
   }
 }; 
