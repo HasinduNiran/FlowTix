@@ -126,6 +126,45 @@ export const RouteSectionService = {
       console.error('Error calculating fare:', error);
       throw error;
     }
+  },
+
+  // Get route sections for owner's routes only
+  async getRouteSectionsByOwner(ownerId: string): Promise<RouteSection[]> {
+    try {
+      // First get buses owned by this owner to get route IDs
+      const busResponse = await api.get(`/buses/owner/${ownerId}`);
+      const buses = busResponse.data.data;
+      
+      if (!buses || buses.length === 0) {
+        return [];
+      }
+      
+      // Extract unique route IDs from the buses
+      const routeIds = [...new Set(buses.map((bus: any) => bus.routeId?._id || bus.routeId).filter(Boolean))];
+      
+      if (routeIds.length === 0) {
+        return [];
+      }
+      
+      // Get route sections for each route owned by this owner
+      const allRouteSections = await Promise.all(
+        routeIds.map(async (routeId) => {
+          try {
+            const response = await api.get(`/route-sections/route/${routeId}`);
+            return response.data.data || [];
+          } catch (error) {
+            console.error(`Error fetching route sections for route ${routeId}:`, error);
+            return [];
+          }
+        })
+      );
+      
+      // Flatten the array of route sections
+      return allRouteSections.flat();
+    } catch (error) {
+      console.error('Error fetching route sections by owner:', error);
+      throw error;
+    }
   }
 };
 

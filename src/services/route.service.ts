@@ -260,5 +260,47 @@ export const RouteService = {
       console.error('Error searching routes by number:', error);
       throw error;
     }
+  },
+
+  // Get routes by owner - filters routes based on buses owned by the user
+  async getRoutesByOwner(ownerId: string): Promise<Route[]> {
+    try {
+      // First get buses owned by this owner
+      const busResponse = await api.get(`/buses/owner/${ownerId}`);
+      const buses = busResponse.data.data;
+      
+      if (!buses || buses.length === 0) {
+        return [];
+      }
+      
+      // Extract unique route IDs from the buses
+      const routeIds = [...new Set(buses.map((bus: any) => bus.routeId?._id || bus.routeId).filter(Boolean))];
+      
+      if (routeIds.length === 0) {
+        return [];
+      }
+      
+      // Get all routes and filter by route IDs
+      const response = await api.get('/routes?limit=100&isActive=true');
+      const allRoutes = response.data.data.map((route: any) => ({
+        _id: route._id,
+        name: route.routeName,
+        code: route.routeNumber,
+        startLocation: route.startPoint,
+        endLocation: route.endPoint,
+        distance: route.distance,
+        estimatedDuration: route.estimatedDuration,
+        isActive: route.isActive,
+        description: route.description,
+        createdAt: route.createdAt,
+        updatedAt: route.updatedAt
+      }));
+      
+      // Filter routes that belong to this owner's buses
+      return allRoutes.filter((route: Route) => routeIds.includes(route._id));
+    } catch (error) {
+      console.error('Error fetching routes by owner:', error);
+      throw error;
+    }
   }
 }; 
