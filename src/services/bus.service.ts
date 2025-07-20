@@ -87,7 +87,9 @@ export const BusService = {
 
   async getBusesByOwner(ownerId: string): Promise<Bus[]> {
     try {
+      console.log('Fetching buses for owner:', ownerId);
       const response = await api.get(`/buses/owner/${ownerId}`);
+      console.log('Buses response:', response.data);
       return response.data.data;
     } catch (error) {
       console.error(`Error fetching buses for owner ${ownerId}:`, error);
