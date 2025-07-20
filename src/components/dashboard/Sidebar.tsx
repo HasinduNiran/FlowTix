@@ -25,7 +25,8 @@ export default function Sidebar({ role }: SidebarProps) {
     { name: 'Trips', href: '/super-admin/trips', icon: '🚍' },
     { name: 'Tickets', href: '/super-admin/tickets', icon: '🎫' },
     { name: 'Day End', href: '/super-admin/day-end', icon: '🌅' },
-    { name: 'Expenses', href: '/super-admin/expenses', icon: '💰' },
+    { name: 'Monthly Fees', href: '/super-admin/monthly-fees', icon: '💰' },
+    { name: 'Expenses', href: '/super-admin/expenses', icon: '�' },
     { name: 'Reports', href: '/super-admin/reports', icon: '📝' },
     { name: 'Settings', href: '/super-admin/settings', icon: '⚙️' },
   ];
