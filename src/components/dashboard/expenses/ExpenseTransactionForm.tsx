@@ -3,9 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { ExpenseTransaction, CreateExpenseTransactionData, UpdateExpenseTransactionData, ExpenseTransactionService } from '@/services/expense.service';
 import { ExpenseTypeService, ExpenseType } from '@/services/expense.service';
+import { BusService, Bus } from '@/services/bus.service';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 
 interface ExpenseTransactionFormProps {
   initialData?: ExpenseTransaction | null;
@@ -18,6 +20,7 @@ export default function ExpenseTransactionForm({
   isEdit = false,
   onSuccess
 }: ExpenseTransactionFormProps) {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     expenseTypeId: '',
     amount: 0,
@@ -28,26 +31,45 @@ export default function ExpenseTransactionForm({
   });
 
   const [availableExpenseTypes, setAvailableExpenseTypes] = useState<ExpenseType[]>([]);
+  const [availableBuses, setAvailableBuses] = useState<Bus[]>([]);
+  const [filteredBuses, setFilteredBuses] = useState<Bus[]>([]);
+  const [filteredExpenseTypes, setFilteredExpenseTypes] = useState<ExpenseType[]>([]);
+  const [selectedBusId, setSelectedBusId] = useState<string>('');
+  const [busSearchTerm, setBusSearchTerm] = useState('');
+  const [showBusSuggestions, setShowBusSuggestions] = useState(false);
+  const [selectedBusIndex, setSelectedBusIndex] = useState(-1);
   const [expenseTypesLoading, setExpenseTypesLoading] = useState(false);
+  const [busesLoading, setBusesLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [billFile, setBillFile] = useState<File | null>(null);
+  const [billPreview, setBillPreview] = useState<string>('');
   const router = useRouter();
 
   useEffect(() => {
     fetchAvailableExpenseTypes();
+    fetchAvailableBuses();
   }, []);
 
   useEffect(() => {
     if (initialData && isEdit) {
       setFormData({
-        expenseTypeId: typeof initialData.expenseTypeId === 'string' ? initialData.expenseTypeId : initialData.expenseTypeId._id,
+        expenseTypeId: initialData.expenseTypeId ? 
+          (typeof initialData.expenseTypeId === 'string' ? 
+            initialData.expenseTypeId : 
+            initialData.expenseTypeId._id) : '',
         amount: initialData.amount,
         date: new Date(initialData.date).toISOString().split('T')[0],
         uploadedBill: initialData.uploadedBill || '',
         notes: initialData.notes || '',
         isActive: initialData.isActive
       });
+      
+      // If we have an existing receipt URL, set it as preview
+      if (initialData.uploadedBill) {
+        setBillPreview(initialData.uploadedBill);
+      }
     }
   }, [initialData, isEdit]);
 
@@ -56,12 +78,126 @@ export default function ExpenseTransactionForm({
       setExpenseTypesLoading(true);
       const expenseTypes = await ExpenseTypeService.getAllExpenseTypes();
       setAvailableExpenseTypes(expenseTypes.filter(type => type.isActive));
+      setFilteredExpenseTypes(expenseTypes.filter(type => type.isActive));
     } catch (error) {
       console.error('Error fetching expense types:', error);
+      if (error instanceof Error && error.message.includes('401')) {
+        setError('Authentication failed. Please log in again.');
+        return;
+      }
       setError('Failed to load available expense types');
     } finally {
       setExpenseTypesLoading(false);
     }
+  };
+
+  const fetchAvailableBuses = async () => {
+    if (!user) return;
+
+    try {
+      setBusesLoading(true);
+      const buses = await BusService.getAllBuses();
+      setAvailableBuses(buses);
+      setFilteredBuses(buses);
+    } catch (error) {
+      console.error('Error fetching buses:', error);
+      if (error instanceof Error && error.message.includes('401')) {
+        setError('Authentication failed. Please log in again.');
+        return;
+      }
+      setError('Failed to load buses');
+    } finally {
+      setBusesLoading(false);
+    }
+  };
+
+  // Filter expense types based on selected bus
+  useEffect(() => {
+    if (selectedBusId) {
+      const filtered = availableExpenseTypes.filter(expenseType => 
+        expenseType.busId === selectedBusId
+      );
+      setFilteredExpenseTypes(filtered);
+      
+      // Reset expense type selection if current selection doesn't match the bus
+      const currentExpenseType = availableExpenseTypes.find(et => et._id === formData.expenseTypeId);
+      if (currentExpenseType && currentExpenseType.busId !== selectedBusId) {
+        setFormData(prev => ({ ...prev, expenseTypeId: '' }));
+      }
+    } else {
+      setFilteredExpenseTypes(availableExpenseTypes);
+    }
+  }, [selectedBusId, availableExpenseTypes, formData.expenseTypeId]);
+
+  // Filter buses based on search term
+  useEffect(() => {
+    if (busSearchTerm) {
+      const filtered = availableBuses.filter(bus =>
+        bus.busNumber.toLowerCase().includes(busSearchTerm.toLowerCase())
+      );
+      setFilteredBuses(filtered);
+    } else {
+      setFilteredBuses(availableBuses);
+    }
+  }, [busSearchTerm, availableBuses]);
+
+  // Handle bus selection
+  const handleBusSelect = (bus: Bus) => {
+    setSelectedBusId(bus._id);
+    setBusSearchTerm(bus.busNumber);
+    setShowBusSuggestions(false);
+    setSelectedBusIndex(-1);
+  };
+
+  // Handle bus keyboard navigation
+  const handleBusKeyDown = (e: React.KeyboardEvent) => {
+    if (!showBusSuggestions || filteredBuses.length === 0) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedBusIndex(prev => 
+          prev < filteredBuses.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedBusIndex(prev => prev > 0 ? prev - 1 : -1);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (selectedBusIndex >= 0) {
+          handleBusSelect(filteredBuses[selectedBusIndex]);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setShowBusSuggestions(false);
+        setSelectedBusIndex(-1);
+        break;
+    }
+  };
+
+  // Handle file upload
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setBillFile(file);
+      
+      // Create preview URL
+      const reader = new FileReader();
+      reader.onload = () => {
+        setBillPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Remove uploaded file
+  const removeFile = () => {
+    setBillFile(null);
+    setBillPreview('');
+    setFormData(prev => ({ ...prev, uploadedBill: '' }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -74,6 +210,12 @@ export default function ExpenseTransactionForm({
     setSuccess(null);
 
     // Validation
+    if (!selectedBusId) {
+      setError('Please select a bus');
+      setIsSubmitting(false);
+      return;
+    }
+
     if (!formData.expenseTypeId) {
       setError('Please select an expense type');
       setIsSubmitting(false);
@@ -93,8 +235,20 @@ export default function ExpenseTransactionForm({
     }
 
     try {
+      let billUrl = formData.uploadedBill;
+
+      // If there's a file to upload, handle it here
+      // Note: In a real implementation, you would upload the file to your server/cloud storage
+      // and get back a URL. For now, we'll use the preview URL or existing URL
+      if (billFile && billPreview) {
+        // In a real app, you would upload to your server here:
+        // billUrl = await uploadFile(billFile);
+        billUrl = billPreview; // Using preview for now
+      }
+
       const submitData = {
         ...formData,
+        uploadedBill: billUrl,
         date: new Date(formData.date).toISOString()
       };
 
@@ -120,8 +274,12 @@ export default function ExpenseTransactionForm({
       }
     } catch (error: any) {
       console.error('Error submitting form:', error);
-      const errorMessage = error?.response?.data?.message || error.message || `Failed to ${isEdit ? 'update' : 'create'} expense transaction`;
-      setError(errorMessage);
+      if (error?.response?.status === 401) {
+        setError('Authentication failed. Please log in again.');
+      } else {
+        const errorMessage = error?.response?.data?.message || error.message || `Failed to ${isEdit ? 'update' : 'create'} expense transaction`;
+        setError(errorMessage);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -214,6 +372,84 @@ export default function ExpenseTransactionForm({
                 </div>
                 
                 <div className="space-y-4">
+                  {/* Bus Number Field */}
+                  <div className="relative">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Bus Number <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        value={busSearchTerm}
+                        onChange={(e) => {
+                          setBusSearchTerm(e.target.value);
+                          setShowBusSuggestions(true);
+                          setSelectedBusIndex(-1);
+                        }}
+                        onKeyDown={handleBusKeyDown}
+                        onFocus={() => setShowBusSuggestions(true)}
+                        onBlur={() => {
+                          // Delay hiding suggestions to allow for click
+                          setTimeout(() => setShowBusSuggestions(false), 200);
+                        }}
+                        placeholder="Type bus number..."
+                        required
+                        className="w-full border-green-300 focus:ring-green-500 focus:border-green-500"
+                      />
+                      
+                      {/* Loading indicator for buses */}
+                      {busesLoading && (
+                        <div className="absolute right-3 top-2">
+                          <div className="animate-spin rounded-full h-5 w-5 border-2 border-green-600 border-t-transparent"></div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Bus suggestions dropdown */}
+                    {showBusSuggestions && filteredBuses.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-green-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {filteredBuses.map((bus, index) => (
+                          <div
+                            key={bus._id}
+                            className={`px-4 py-2 cursor-pointer transition-colors ${
+                              index === selectedBusIndex
+                                ? 'bg-green-50 text-green-800'
+                                : 'hover:bg-gray-50'
+                            }`}
+                            onClick={() => handleBusSelect(bus)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-900">{bus.busNumber}</div>
+                                <div className="text-sm text-gray-500">
+                                  {bus.busName} • Capacity: {bus.seatCapacity}
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span className={`px-2 py-1 text-xs rounded-full ${
+                                  bus.status === 'active' 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : bus.status === 'inactive'
+                                    ? 'bg-gray-100 text-gray-800'
+                                    : 'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                  {bus.status}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* No buses found */}
+                    {showBusSuggestions && busSearchTerm && filteredBuses.length === 0 && !busesLoading && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-gray-500">
+                        No buses found matching "{busSearchTerm}"
+                      </div>
+                    )}
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Expense Type <span className="text-red-500">*</span>
@@ -228,15 +464,23 @@ export default function ExpenseTransactionForm({
                         value={formData.expenseTypeId}
                         onChange={(e) => setFormData({ ...formData, expenseTypeId: e.target.value })}
                         required
-                        className="w-full px-3 py-2 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white"
+                        disabled={!selectedBusId}
+                        className="w-full px-3 py-2 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors bg-white disabled:bg-gray-50 disabled:text-gray-500"
                       >
-                        <option value="">Select an expense type</option>
-                        {availableExpenseTypes.map((type) => (
+                        <option value="">
+                          {selectedBusId ? "Select an expense type" : "Select a bus first"}
+                        </option>
+                        {filteredExpenseTypes.map((type) => (
                           <option key={type._id} value={type._id}>
                             {type.expenseName} - {type.description}
                           </option>
                         ))}
                       </select>
+                    )}
+                    {selectedBusId && filteredExpenseTypes.length === 0 && (
+                      <p className="text-sm text-amber-600 mt-1">
+                        No expense types found for the selected bus.
+                      </p>
                     )}
                   </div>
                   
@@ -245,7 +489,7 @@ export default function ExpenseTransactionForm({
                       Amount <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-2 text-green-600 font-medium">$</span>
+                      <span className="absolute left-3 top-2 text-green-600 font-medium">Rs.</span>
                       <Input
                         type="number"
                         value={formData.amount}
@@ -254,7 +498,7 @@ export default function ExpenseTransactionForm({
                         min="0"
                         step="0.01"
                         required
-                        className="w-full pl-8 border-green-300 focus:ring-green-500 focus:border-green-500"
+                        className="w-full pl-12 border-green-300 focus:ring-green-500 focus:border-green-500"
                       />
                     </div>
                   </div>
@@ -288,16 +532,70 @@ export default function ExpenseTransactionForm({
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Receipt/Bill URL
+                      Receipt/Bill Upload
                     </label>
-                    <Input
-                      type="url"
-                      value={formData.uploadedBill}
-                      onChange={(e) => setFormData({ ...formData, uploadedBill: e.target.value })}
-                      placeholder="https://example.com/receipt.pdf"
-                      className="w-full border-blue-300 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Optional: URL link to the receipt or bill</p>
+                    <div className="space-y-3">
+                      {/* File input */}
+                      <div className="flex items-center space-x-3">
+                        <label className="relative cursor-pointer bg-white border border-blue-300 rounded-lg px-4 py-2 hover:bg-blue-50 transition-colors">
+                          <span className="text-sm font-medium text-blue-600">Choose File</span>
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            onChange={handleFileChange}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          />
+                        </label>
+                        <span className="text-sm text-gray-500">
+                          {billFile ? billFile.name : 'No file selected'}
+                        </span>
+                      </div>
+
+                      {/* Preview */}
+                      {billPreview && (
+                        <div className="relative bg-gray-50 p-4 rounded-lg border border-gray-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-gray-700">Preview:</span>
+                            <button
+                              type="button"
+                              onClick={removeFile}
+                              className="text-red-600 hover:text-red-800 text-sm font-medium"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                          {billPreview.startsWith('data:image') ? (
+                            <img
+                              src={billPreview}
+                              alt="Receipt preview"
+                              className="max-w-full max-h-40 object-contain rounded-lg"
+                            />
+                          ) : (
+                            <div className="flex items-center space-x-2 text-gray-600">
+                              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              <span>Document uploaded</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Or manual URL input */}
+                      <div className="border-t border-gray-200 pt-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Or enter URL manually:
+                        </label>
+                        <Input
+                          type="url"
+                          value={formData.uploadedBill}
+                          onChange={(e) => setFormData({ ...formData, uploadedBill: e.target.value })}
+                          placeholder="https://example.com/receipt.pdf"
+                          className="w-full border-blue-300 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Upload an image or PDF of the receipt/bill, or provide a URL</p>
                   </div>
                   
                   <div>
@@ -336,14 +634,14 @@ export default function ExpenseTransactionForm({
                 type="button"
                 onClick={handleCancel}
                 disabled={isSubmitting}
-                className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-medium transition-all duration-200"
+                className="px-8 py-3 bg-red-100 text-red-700 hover:bg-red-200 border border-red-200 hover:border-red-300 rounded-xl font-medium transition-all duration-200"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting || expenseTypesLoading}
-                className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 flex items-center"
+                disabled={isSubmitting || expenseTypesLoading || !selectedBusId}
+                className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (
                   <>
