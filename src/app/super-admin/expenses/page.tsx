@@ -70,12 +70,17 @@ export default function ExpensesPage() {
     return expenseTransactions.reduce((total, transaction) => total + transaction.amount, 0);
   };
 
-  const getExpenseTypeDisplay = (expenseTypeId: string | ExpenseType) => {
+  const getExpenseTypeDisplay = (expenseTypeId: string | ExpenseType | null) => {
+    if (!expenseTypeId) {
+      return 'Unknown Type';
+    }
+    
     if (typeof expenseTypeId === 'string') {
       const expenseType = expenseTypes.find(type => type._id === expenseTypeId);
       return expenseType ? expenseType.expenseName : 'Unknown Type';
     }
-    return expenseTypeId.expenseName;
+    
+    return expenseTypeId.expenseName || 'Unknown Type';
   };
 
   if (loading) {
@@ -206,7 +211,7 @@ export default function ExpensesPage() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-500">Total Expenses</p>
-                    <p className="text-2xl font-bold text-gray-900">${getTotalExpenses().toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-gray-900">Rs. {getTotalExpenses().toLocaleString()}</p>
                   </div>
                 </div>
               </div>
@@ -296,7 +301,7 @@ export default function ExpensesPage() {
                           {getExpenseTypeDisplay(transaction.expenseTypeId)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                          ${transaction.amount.toLocaleString()}
+                          Rs. {transaction.amount.toLocaleString()}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
                           {transaction.notes || 'No notes'}
@@ -372,7 +377,7 @@ export default function ExpensesPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {typeof type.busId === 'object' ? type.busId.busNumber : 'N/A'}
+                        {typeof type.busId === 'object' && type.busId ? type.busId.busNumber : 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -491,7 +496,7 @@ export default function ExpensesPage() {
                         {getExpenseTypeDisplay(transaction.expenseTypeId)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                        ${transaction.amount.toLocaleString()}
+                        Rs. {transaction.amount.toLocaleString()}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
                         {transaction.notes || 'No notes'}

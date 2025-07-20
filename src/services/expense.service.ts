@@ -17,7 +17,7 @@ export interface ExpenseType {
 
 export interface ExpenseTransaction {
   _id: string;
-  expenseTypeId: string | ExpenseType;
+  expenseTypeId: string | ExpenseType | null;
   amount: number;
   date: string;
   uploadedBill?: string;
