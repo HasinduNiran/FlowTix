@@ -1,95 +1,196 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
-interface MonthlyFee {
-  id: string;
-  busNumber: string;
-  busId: string;
-  dueDate: string;
-  amount: number;
-  status: 'paid' | 'pending' | 'overdue';
-  paymentDate?: string;
-  month: string;
-  year: number;
-}
+import { useAuth } from '@/context/AuthContext';
+import { MonthlyFeeService, MonthlyFee } from '@/services/monthlyFee.service';
+import { BusService, Bus } from '@/services/bus.service';
 
 export default function MonthlyFeesPage() {
+  const { user } = useAuth();
   const [monthlyFees, setMonthlyFees] = useState<MonthlyFee[]>([]);
+  const [buses, setBuses] = useState<Bus[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'paid' | 'pending' | 'overdue'>('all');
+  const [error, setError] = useState<string>('');
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [selectedBus, setSelectedBus] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+    currentPage: 1
+  });
+
+  const fetchMonthlyFees = async (page: number = 1) => {
+    if (!user?.id) {
+      setError('User information not available');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      
+      const filters: any = {
+        page,
+        limit: pagination.limit
+      };
+      
+      if (selectedBus) filters.busId = selectedBus;
+      if (selectedStatus) filters.status = selectedStatus;
+      if (selectedMonth) filters.month = selectedMonth;
+      
+      console.log('Fetching monthly fees with filters:', filters);
+      console.log('Owner ID:', user.id);
+      
+      const result = await MonthlyFeeService.getMonthlyFeesByOwner(user.id, filters);
+      console.log('Monthly fees result:', result);
+      
+      setMonthlyFees(result.data || []);
+      setPagination({
+        page: result.currentPage || page,
+        limit: pagination.limit,
+        total: result.total || 0,
+        totalPages: result.totalPages || 1,
+        currentPage: result.currentPage || page
+      });
+    } catch (error: any) {
+      console.error('Error fetching monthly fees:', error);
+      setError(error.message || 'Failed to fetch monthly fees');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchBuses = async () => {
+    if (!user?.id) return;
+    
+    try {
+      console.log('Fetching buses for owner ID:', user.id);
+      const ownerBuses = await BusService.getBusesByOwner(user.id);
+      console.log('Owner buses:', ownerBuses);
+      setBuses(ownerBuses);
+    } catch (error: any) {
+      console.error('Error fetching buses:', error);
+      // Don't set error state for buses as monthly fees can still load
+    }
+  };
 
   useEffect(() => {
-    const fetchMonthlyFees = async () => {
-      try {
-        // Simulate API call - replace with actual backend call
-        setTimeout(() => {
-          const mockData: MonthlyFee[] = [
-            {
-              id: '1',
-              busNumber: 'B001',
-              busId: 'bus1',
-              dueDate: '2025-01-31',
-              amount: 15000,
-              status: 'paid',
-              paymentDate: '2025-01-15',
-              month: 'January',
-              year: 2025,
-            },
-            {
-              id: '2',
-              busNumber: 'B002',
-              busId: 'bus2',
-              dueDate: '2025-01-31',
-              amount: 15000,
-              status: 'pending',
-              month: 'January',
-              year: 2025,
-            },
-            {
-              id: '3',
-              busNumber: 'B003',
-              busId: 'bus3',
-              dueDate: '2024-12-31',
-              amount: 15000,
-              status: 'overdue',
-              month: 'December',
-              year: 2024,
-            },
-          ];
-          setMonthlyFees(mockData);
-          setLoading(false);
-        }, 1000);
-      } catch (error) {
-        console.error('Error fetching monthly fees:', error);
-        setLoading(false);
-      }
-    };
+    fetchBuses();
+  }, [user?.id]);
 
-    fetchMonthlyFees();
-  }, []);
+  useEffect(() => {
+    fetchMonthlyFees(1);
+  }, [user?.id, selectedBus, selectedStatus, selectedMonth]);
 
-  const filteredFees = monthlyFees.filter(fee => 
-    filter === 'all' || fee.status === filter
-  );
+  const handleDownloadBill = async (monthlyFee: MonthlyFee) => {
+    if (monthlyFee.status !== 'paid') {
+      alert('Bill can only be downloaded for paid fees');
+      return;
+    }
 
-  const getStatusBadge = (status: MonthlyFee['status']) => {
+    try {
+      setDownloadingId(monthlyFee._id);
+      const busNumber = typeof monthlyFee.busId === 'object' ? monthlyFee.busId.busNumber : 'Unknown';
+      await MonthlyFeeService.downloadBill(monthlyFee._id, busNumber, monthlyFee.month);
+    } catch (error: any) {
+      console.error('Error downloading bill:', error);
+      alert('Failed to download bill: ' + (error.message || error));
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const getBusDisplay = (busData: any) => {
+    if (typeof busData === 'object' && busData) {
+      return `${busData.busNumber} - ${busData.busName}`;
+    }
+    return 'Unknown Bus';
+  };
+
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'paid':
         return 'bg-green-100 text-green-800';
-      case 'pending':
+      case 'partial':
         return 'bg-yellow-100 text-yellow-800';
-      case 'overdue':
+      case 'unpaid':
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
   };
 
-  if (loading) {
+  const getStatusDisplay = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return 'Paid';
+      case 'partial':
+        return 'Partially Paid';
+      case 'unpaid':
+        return 'Unpaid';
+      default:
+        return status;
+    }
+  };
+
+  const formatDate = (date: string | null) => {
+    if (!date) return 'N/A';
+    return new Date(date).toLocaleDateString();
+  };
+
+  const formatMonth = (month: string) => {
+    try {
+      const date = new Date(month);
+      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+    } catch {
+      return month;
+    }
+  };
+
+  // Generate month options for the last 12 months
+  const generateMonthOptions = () => {
+    const months = [];
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthStr = date.toISOString().substring(0, 7); // YYYY-MM format
+      const displayStr = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+      months.push({ value: monthStr, display: displayStr });
+    }
+    return months;
+  };
+
+  if (loading && monthlyFees.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h1 className="text-2xl font-bold text-gray-900">Monthly Fees</h1>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <span className="text-4xl mb-4 block">⚠️</span>
+          <h3 className="text-lg font-semibold text-red-900 mb-2">Error Loading Monthly Fees</h3>
+          <p className="text-red-700">{error}</p>
+          <button 
+            onClick={() => fetchMonthlyFees(1)}
+            disabled={loading}
+            className="mt-4 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg"
+          >
+            {loading ? 'Loading...' : 'Retry'}
+          </button>
+        </div>
       </div>
     );
   }
@@ -102,49 +203,167 @@ export default function MonthlyFeesPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Monthly Fees</h1>
             <p className="text-gray-600 mt-1">
-              Manage monthly fee payments for your buses
+              Manage monthly fees for your buses created by admin
             </p>
           </div>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium">
-            Make Payment
-          </button>
+          <div className="flex items-center space-x-4">
+            <div className="text-sm text-gray-500">
+              Total Fees: <span className="font-semibold text-gray-900">{pagination.total}</span>
+            </div>
+            <button 
+              onClick={() => fetchMonthlyFees(pagination.currentPage)}
+              disabled={loading}
+              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            >
+              {loading ? 'Loading...' : 'Refresh'}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Filter Tabs */}
+      {/* Filters */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
-          {(['all', 'paid', 'pending', 'overdue'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setFilter(tab)}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                filter === tab
-                  ? 'bg-white text-blue-600 shadow'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Bus Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Bus</label>
+            <select 
+              value={selectedBus}
+              onChange={(e) => setSelectedBus(e.target.value)}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              {tab !== 'all' && (
-                <span className="ml-2 text-xs bg-gray-200 px-2 py-1 rounded-full">
-                  {monthlyFees.filter(fee => fee.status === tab).length}
-                </span>
-              )}
+              <option value="">All Buses</option>
+              {buses.map((bus) => (
+                <option key={bus._id} value={bus._id}>
+                  {bus.busNumber} - {bus.busName}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+            <select 
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">All Status</option>
+              <option value="paid">Paid</option>
+              <option value="partial">Partially Paid</option>
+              <option value="unpaid">Unpaid</option>
+            </select>
+          </div>
+
+          {/* Month Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Month</label>
+            <select 
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">All Months</option>
+              {generateMonthOptions().map((month) => (
+                <option key={month.value} value={month.value}>
+                  {month.display}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Clear Filters */}
+          <div className="flex items-end">
+            <button
+              onClick={() => {
+                setSelectedBus('');
+                setSelectedStatus('');
+                setSelectedMonth('');
+              }}
+              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+            >
+              Clear Filters
             </button>
-          ))}
+          </div>
+        </div>
+
+        {/* Filter Info */}
+        {(selectedBus || selectedStatus || selectedMonth) && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <p className="text-sm text-blue-800">
+              <span className="font-medium">Active Filters:</span>
+              {selectedBus && <span className="ml-2">Bus: {buses.find(b => b._id === selectedBus)?.busNumber}</span>}
+              {selectedStatus && <span className="ml-2">Status: {getStatusDisplay(selectedStatus)}</span>}
+              {selectedMonth && <span className="ml-2">Month: {generateMonthOptions().find(m => m.value === selectedMonth)?.display}</span>}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center">
+            <span className="text-2xl mr-3">📄</span>
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Fees</p>
+              <p className="text-2xl font-bold text-gray-900">{pagination.total}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center">
+            <span className="text-2xl mr-3">💰</span>
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Amount</p>
+              <p className="text-2xl font-bold text-gray-900">
+                LKR {monthlyFees.reduce((sum, fee) => sum + fee.amount, 0).toLocaleString()}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center">
+            <span className="text-2xl mr-3">✅</span>
+            <div>
+              <p className="text-sm font-medium text-gray-600">Paid Amount</p>
+              <p className="text-2xl font-bold text-green-600">
+                LKR {monthlyFees.reduce((sum, fee) => sum + fee.paidAmount, 0).toLocaleString()}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center">
+            <span className="text-2xl mr-3">⏳</span>
+            <div>
+              <p className="text-sm font-medium text-gray-600">Outstanding</p>
+              <p className="text-2xl font-bold text-red-600">
+                LKR {monthlyFees.reduce((sum, fee) => sum + (fee.amount - fee.paidAmount), 0).toLocaleString()}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Monthly Fees List */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Fee Records</h3>
+          <h3 className="text-lg font-semibold text-gray-900">
+            Monthly Fee Records ({monthlyFees.length})
+          </h3>
         </div>
         
-        {filteredFees.length === 0 ? (
+        {monthlyFees.length === 0 ? (
           <div className="p-6 text-center">
-            <span className="text-4xl mb-4 block">💰</span>
-            <p className="text-gray-500">No monthly fees found for the selected filter.</p>
+            <span className="text-4xl mb-4 block">📄</span>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              No Monthly Fees Found
+            </h3>
+            <p className="text-gray-500">
+              No monthly fees have been created by the admin for your buses yet.
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -152,22 +371,19 @@ export default function MonthlyFeesPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Bus
+                    Fee Details
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Period
+                    Bus Information
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Amount
+                    Amount Details
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Due Date
+                    Payment Info
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Payment Date
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -175,46 +391,66 @@ export default function MonthlyFeesPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredFees.map((fee) => (
-                  <tr key={fee.id} className="hover:bg-gray-50">
+                {monthlyFees.map((fee) => (
+                  <tr key={fee._id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <span className="text-2xl mr-3">🚌</span>
+                        <span className="text-2xl mr-3">📄</span>
                         <div>
                           <div className="text-sm font-medium text-gray-900">
-                            {fee.busNumber}
+                            {formatMonth(fee.month)}
                           </div>
                           <div className="text-sm text-gray-500">
-                            ID: {fee.busId}
+                            Created: {formatDate(fee.createdAt)}
                           </div>
+                          {fee.notes && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              {fee.notes}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {fee.month} {fee.year}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {getBusDisplay(fee.busId)}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                      LKR {fee.amount.toLocaleString()}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        Total: LKR {fee.amount.toLocaleString()}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        Paid: LKR {fee.paidAmount.toLocaleString()}
+                      </div>
+                      {fee.amount !== fee.paidAmount && (
+                        <div className="text-sm text-red-600">
+                          Outstanding: LKR {(fee.amount - fee.paidAmount).toLocaleString()}
+                        </div>
+                      )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(fee.dueDate).toLocaleDateString()}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {fee.paymentDate ? formatDate(fee.paymentDate) : 'Not paid'}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(fee.status)}`}>
-                        {fee.status.charAt(0).toUpperCase() + fee.status.slice(1)}
+                        {getStatusDisplay(fee.status)}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {fee.paymentDate ? new Date(fee.paymentDate).toLocaleDateString() : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex space-x-2">
-                        {fee.status === 'pending' || fee.status === 'overdue' ? (
-                          <button className="text-blue-600 hover:text-blue-900 px-3 py-1 text-sm border border-blue-600 rounded">
-                            Pay Now
+                        {fee.status === 'paid' && (
+                          <button
+                            onClick={() => handleDownloadBill(fee)}
+                            disabled={downloadingId === fee._id}
+                            className="text-green-600 hover:text-green-900 px-3 py-1 text-sm border border-green-600 rounded disabled:opacity-50"
+                          >
+                            {downloadingId === fee._id ? 'Downloading...' : 'Download Bill'}
                           </button>
-                        ) : null}
-                        <button className="text-gray-600 hover:text-gray-900 px-3 py-1 text-sm border border-gray-300 rounded">
+                        )}
+                        <button className="text-blue-600 hover:text-blue-900 px-3 py-1 text-sm border border-blue-600 rounded">
                           View Details
                         </button>
                       </div>
@@ -223,6 +459,34 @@ export default function MonthlyFeesPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {pagination.totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+            <div className="text-sm text-gray-500">
+              Showing {((pagination.currentPage - 1) * pagination.limit) + 1} to {Math.min(pagination.currentPage * pagination.limit, pagination.total)} of {pagination.total} fees
+            </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => fetchMonthlyFees(pagination.currentPage - 1)}
+                disabled={pagination.currentPage <= 1 || loading}
+                className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 hover:bg-gray-50"
+              >
+                Previous
+              </button>
+              <span className="px-3 py-1 text-sm">
+                Page {pagination.currentPage} of {pagination.totalPages}
+              </span>
+              <button
+                onClick={() => fetchMonthlyFees(pagination.currentPage + 1)}
+                disabled={pagination.currentPage >= pagination.totalPages || loading}
+                className="px-3 py-1 text-sm border border-gray-300 rounded disabled:opacity-50 hover:bg-gray-50"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>
