@@ -36,6 +36,17 @@ export const UserService = {
     }
   },
 
+  // Get users by owner (managers and conductors created by or assigned to the owner)
+  async getUsersByOwner(): Promise<BackendUser[]> {
+    try {
+      const response = await api.get('/auth/users');
+      return response.data.data;
+    } catch (error) {
+      console.error('Error fetching users by owner:', error);
+      throw error;
+    }
+  },
+
   // Create new user
   async createUser(userData: CreateUserRequest): Promise<BackendUser> {
     try {
