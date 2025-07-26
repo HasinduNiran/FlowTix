@@ -239,5 +239,58 @@ export const TripService = {
         throw new Error('Failed to fetch trips');
       }
     }
+  },
+
+  async getTripsByManager(managerId: string, filters?: { date?: string; busId?: string; page?: number; limit?: number; sort?: string }): Promise<{trips: Trip[], total: number, totalPages: number, currentPage: number}> {
+    try {
+      console.log('getTripsByManager called with:', { managerId, filters });
+      
+      // Build query parameters
+      const params: any = {
+        page: filters?.page || 1,
+        limit: filters?.limit || 20,
+        sort: filters?.sort || '-startTime'
+      };
+      
+      if (filters?.date) {
+        params.startDate = filters.date;
+        params.endDate = filters.date;
+      }
+
+      if (filters?.busId) {
+        params.busId = filters.busId;
+      }
+
+      console.log('Requesting manager trips with params:', params);
+      
+      // Use the manager trips endpoint
+      const response = await api.get('/manager/trips', { params });
+      console.log('Manager trips API response:', response.data);
+      
+      const trips = response.data.data || [];
+      const total = response.data.total || 0;
+      const totalPages = response.data.totalPages || 0;
+      const currentPage = response.data.page || 1;
+      
+      const result = {
+        trips: trips,
+        total: total,
+        totalPages: totalPages,
+        currentPage: currentPage
+      };
+      
+      console.log('Final getTripsByManager result:', result);
+      return result;
+    } catch (error: any) {
+      console.error('Error in getTripsByManager:', error);
+      // Check if it's a network error or API error
+      if (error.response) {
+        throw new Error(error.response.data?.message || `API Error: ${error.response.status}`);
+      } else if (error.message) {
+        throw new Error(error.message);
+      } else {
+        throw new Error('Failed to fetch manager trips');
+      }
+    }
   }
 }; 
