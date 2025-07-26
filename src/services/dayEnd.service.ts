@@ -130,6 +130,96 @@ export const DayEndService = {
     }
   },
 
+  async getDayEndsByManager(filters?: { 
+    startDate?: string; 
+    endDate?: string; 
+    busId?: string; 
+    status?: string;
+    page?: number; 
+    limit?: number; 
+    sort?: string 
+  }): Promise<{reports: DayEnd[], count: number, totalPages: number, currentPage: number}> {
+    try {
+      console.log('getDayEndsByManager called with:', filters);
+      
+      // Build query parameters
+      const params: any = {
+        page: filters?.page || 1,
+        limit: filters?.limit || 20
+      };
+      
+      if (filters?.startDate) {
+        params.startDate = filters.startDate;
+      }
+      
+      if (filters?.endDate) {
+        params.endDate = filters.endDate;
+      }
+      
+      if (filters?.status) {
+        params.status = filters.status;
+      }
+
+      if (filters?.busId) {
+        params.busId = filters.busId;
+      }
+
+      console.log('Manager day end API params:', params);
+      
+      const response = await api.get('/manager/day-end', { params });
+      console.log('Manager day end API response:', response.data);
+      
+      return {
+        reports: response.data.reports || [],
+        count: response.data.count || 0,
+        totalPages: response.data.totalPages || 0,
+        currentPage: response.data.currentPage || 1
+      };
+    } catch (error) {
+      console.error('Error fetching manager day end reports:', error);
+      throw error;
+    }
+  },
+
+  async createManagerDayEnd(data: CreateDayEndData): Promise<DayEnd> {
+    try {
+      const response = await api.post('/manager/day-end', data);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error creating manager day end:', error);
+      throw error;
+    }
+  },
+
+  async getManagerDayEndById(id: string): Promise<DayEnd> {
+    try {
+      const response = await api.get(`/manager/day-end/${id}`);
+      return response.data.data;
+    } catch (error) {
+      console.error(`Error fetching manager day end with id ${id}:`, error);
+      throw error;
+    }
+  },
+
+  async updateManagerDayEndStatus(id: string, status: 'approved' | 'rejected', notes?: string): Promise<DayEnd> {
+    try {
+      const response = await api.patch(`/manager/day-end/${id}/status`, { status, notes });
+      return response.data.data;
+    } catch (error) {
+      console.error(`Error updating manager day end status for id ${id}:`, error);
+      throw error;
+    }
+  },
+
+  async deleteManagerDayEnd(id: string): Promise<void> {
+    try {
+      await api.delete(`/manager/day-end/${id}`);
+    } catch (error) {
+      console.error(`Error deleting manager day end record with id ${id}:`, error);
+      throw error;
+    }
+  },
+
   async getDayEndsByOwner(ownerId: string, filters?: { 
     startDate?: string; 
     endDate?: string; 
