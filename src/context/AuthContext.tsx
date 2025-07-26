@@ -41,6 +41,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         router.push('/super-admin/dashboard');
       } else if (user.role === 'bus-owner') {
         router.push('/bus-owner/dashboard');
+      } else if (user.role === 'manager') {
+        router.push('/manager/dashboard');
       } else {
         router.push('/');
       }

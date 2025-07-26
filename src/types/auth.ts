@@ -1,11 +1,12 @@
 export type BackendUserRole = 'admin' | 'owner' | 'manager' | 'conductor';
-export type UserRole = 'super-admin' | 'bus-owner' | 'user';
+export type UserRole = 'super-admin' | 'bus-owner' | 'manager' | 'user';
 
 export interface User {
   id: string;
   email: string;
   name: string;
   role: UserRole;
+  assignedBuses?: string[]; // For managers - list of bus IDs they can manage
   createdAt?: string;
   updatedAt?: string;
 }

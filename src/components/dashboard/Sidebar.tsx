@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
 interface SidebarProps {
-  role: 'super-admin' | 'bus-owner' | 'user';
+  role: 'super-admin' | 'bus-owner' | 'manager' | 'user';
 }
 
 export default function Sidebar({ role }: SidebarProps) {
@@ -44,7 +44,21 @@ export default function Sidebar({ role }: SidebarProps) {
     { name: 'Settings', href: '/bus-owner/settings', icon: '⚙️' },
   ];
 
-  const links = role === 'super-admin' ? superAdminLinks : busOwnerLinks;
+  const managerLinks = [
+    { name: 'Dashboard', href: '/manager/dashboard', icon: '📊' },
+    { name: 'My Bus', href: '/manager/bus', icon: '🚌' },
+    { name: 'Route Sections', href: '/manager/route-sections', icon: '🔗' },
+    { name: 'Trips', href: '/manager/trips', icon: '🚍' },
+    { name: 'Tickets', href: '/manager/tickets', icon: '🎫' },
+    { name: 'Day End', href: '/manager/day-end', icon: '🌅' },
+    { name: 'Monthly Fees', href: '/manager/monthly-fees', icon: '💰' },
+    { name: 'Expenses', href: '/manager/expenses', icon: '💸' },
+    { name: 'Settings', href: '/manager/settings', icon: '⚙️' },
+  ];
+
+  const links = role === 'super-admin' ? superAdminLinks : 
+                role === 'bus-owner' ? busOwnerLinks : 
+                role === 'manager' ? managerLinks : busOwnerLinks;
 
   return (
     <div 

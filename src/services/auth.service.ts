@@ -24,7 +24,8 @@ export const AuthService = {
         id: user._id,
         email: user.username,
         name: user.username,
-        role: this.mapBackendRoleToFrontend(user.role)
+        role: this.mapBackendRoleToFrontend(user.role),
+        assignedBuses: user.assignedBuses || []
       };
       
       return { user: mappedUser, token: accessToken };
@@ -54,7 +55,8 @@ export const AuthService = {
         id: user._id,
         email: user.username,
         name: credentials.name,
-        role: this.mapBackendRoleToFrontend(user.role)
+        role: this.mapBackendRoleToFrontend(user.role),
+        assignedBuses: user.assignedBuses || []
       };
       
       return { user: mappedUser, token: accessToken };
@@ -115,7 +117,8 @@ export const AuthService = {
         id: user._id,
         email: user.username,
         name: user.username,
-        role: this.mapBackendRoleToFrontend(user.role)
+        role: this.mapBackendRoleToFrontend(user.role),
+        assignedBuses: user.assignedBuses || []
       };
     } catch (e) {
       console.error('Error parsing user from localStorage', e);
@@ -132,14 +135,15 @@ export const AuthService = {
   },
   
   // Helper method to map backend roles to frontend roles
-  mapBackendRoleToFrontend(backendRole: string): 'user' | 'bus-owner' | 'super-admin' {
+  mapBackendRoleToFrontend(backendRole: string): 'user' | 'bus-owner' | 'manager' | 'super-admin' {
     switch (backendRole) {
       case 'admin':
         return 'super-admin';
       case 'owner':
         return 'bus-owner';
-      case 'conductor':
       case 'manager':
+        return 'manager';
+      case 'conductor':
       default:
         return 'user';
     }
