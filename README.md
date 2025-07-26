@@ -1,36 +1,124 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FlowTix - Bus Ticket Management System
+
+FlowTix is an industry-level bus ticket management system built with Next.js for the frontend and Node.js/Express for the backend.
+
+## Features
+
+- User authentication (login, signup, forgot password)
+- Role-based access control (super-admin, bus-owner, user)
+- Bus management
+- Route and section management
+- Trip scheduling
+- Ticket booking and management
+- Day-end reporting
+
+## Tech Stack
+
+### Frontend
+- Next.js 15
+- React 19
+- TypeScript
+- Tailwind CSS
+- Axios for API requests
+
+### Backend
+- Node.js
+- Express
+- MongoDB
+- JWT Authentication
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Node.js 18+ and npm
+- MongoDB
+
+### Frontend Setup
+
+1. Clone the repository
+2. Navigate to the FlowTix directory:
+   ```
+   cd FlowTix
+   ```
+3. Install dependencies:
+   ```
+   npm install
+   ```
+4. Create a `.env.local` file with the following variables:
+   ```
+   NEXT_PUBLIC_API_URL=http://localhost:5001/api
+   NEXT_PUBLIC_APP_NAME=FlowTix
+   NEXT_PUBLIC_APP_DESCRIPTION="Bus Ticket Management System"
+   ```
+5. Start the development server:
+   ```
+   npm run dev
+   ```
+6. Open [http://localhost:3000](http://localhost:3000) in your browser
+
+### Backend Setup
+
+1. Navigate to the pos-backend-apis directory:
+   ```
+   cd pos-backend-apis
+   ```
+2. Install dependencies:
+   ```
+   npm install
+   ```
+3. Create a `.env` file with the following variables:
+   ```
+   PORT=5001
+   MONGODB_URI=mongodb://localhost:27017/flowtix
+   NODE_ENV=development
+   JWT_SECRET=your_jwt_secret_key
+   SESSION_SECRET=your_session_secret_key
+   FRONTEND_URL=http://localhost:3000
+   ```
+4. Start the development server:
+   ```
+   npm run dev
+   ```
+
+## Project Structure
+
+### Frontend Structure
+```
+FlowTix/
+├── public/              # Static assets
+├── src/
+│   ├── app/             # Next.js app router pages
+│   ├── components/      # React components
+│   ├── context/         # React context providers
+│   ├── hooks/           # Custom React hooks
+│   ├── services/        # API services
+│   ├── types/           # TypeScript type definitions
+│   └── utils/           # Utility functions
+├── .env.local           # Environment variables
+└── next.config.ts       # Next.js configuration
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Backend Structure
+```
+pos-backend-apis/
+├── src/
+│   ├── config/          # Configuration files
+│   ├── controllers/     # API controllers
+│   ├── middleware/      # Express middleware
+│   ├── models/          # MongoDB models
+│   ├── routes/          # API routes
+│   ├── services/        # Business logic
+│   ├── utils/           # Utility functions
+│   └── server.js        # Main server file
+├── .env                 # Environment variables
+└── package.json         # Project dependencies
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## API Documentation
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The API documentation can be found in the Postman collection file: `postman-route-collection.json`
 
-## Learn More
+## License
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This project is licensed under the MIT License.
