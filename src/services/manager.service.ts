@@ -389,18 +389,82 @@ export const ManagerService = {
     }
   },
 
+  // Get assigned buses for filter dropdown
+  async getAssignedBusesList(): Promise<Array<{
+    _id: string;
+    busId: string;
+    busNumber: string;
+    busName: string;
+    displayName: string;
+    routeName: string;
+    routeNumber: string;
+  }>> {
+    try {
+      const response = await api.get('/auth/manager/buses/list');
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error fetching assigned buses list:', error);
+      throw error;
+    }
+  },
+
+  // Get assigned buses stops for filter dropdown
+  async getAssignedBusesStops(busId?: string): Promise<Array<{
+    _id: string;
+    stopId: string;
+    stopName: string;
+    stopCode?: string;
+    displayName: string;
+    location?: string;
+    routeInfo?: {
+      routeId: string;
+      routeName: string;
+      routeNumber: string;
+    };
+  }>> {
+    try {
+      const params = new URLSearchParams();
+      if (busId && busId !== 'all') {
+        params.append('busId', busId);
+      }
+      
+      const queryString = params.toString();
+      const response = await api.get(`/auth/manager/stops/list${queryString ? `?${queryString}` : ''}`);
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error fetching assigned buses stops list:', error);
+      throw error;
+    }
+  },
+
   // Get tickets for manager's assigned bus
   async getTickets(filter?: {
     status?: 'all' | 'booked' | 'used' | 'cancelled';
-    dateRange?: 'all' | 'today' | 'week' | 'month';
+    startDate?: string; // Changed from dateRange
+    endDate?: string; // Added endDate support
+    busId?: string;
+    fromStopId?: string;
+    toStopId?: string;
   }): Promise<ManagerTicket[]> {
     try {
       const params = new URLSearchParams();
       if (filter?.status && filter.status !== 'all') {
         params.append('status', filter.status);
       }
-      if (filter?.dateRange && filter.dateRange !== 'all') {
-        params.append('dateRange', filter.dateRange);
+      if (filter?.startDate) {
+        params.append('startDate', filter.startDate);
+      }
+      if (filter?.endDate) {
+        params.append('endDate', filter.endDate);
+      }
+      if (filter?.busId && filter.busId !== 'all') {
+        params.append('busId', filter.busId);
+      }
+      if (filter?.fromStopId && filter.fromStopId !== 'all') {
+        params.append('fromStopId', filter.fromStopId);
+      }
+      if (filter?.toStopId && filter.toStopId !== 'all') {
+        params.append('toStopId', filter.toStopId);
       }
       
       const queryString = params.toString();
