@@ -39,18 +39,31 @@ export default function UsersPage() {
     }
   }, [currentUser]);
 
-  const fetchBuses = async () => {
+  // Refetch buses when editing user changes (to include/exclude their assigned buses)
+  useEffect(() => {
+    if (currentUser && editingUser) {
+      fetchBuses(editingUser._id);
+    } else if (currentUser && showAddModal) {
+      fetchBuses(); // For add modal, don't exclude any user
+    }
+  }, [editingUser, showAddModal]);
+
+  const fetchBuses = async (excludeUserId?: string) => {
     if (!currentUser) {
       console.log('No current user found');
       return;
     }
 
     try {
-      // Get buses specifically for the current owner
-      const busesData = await BusService.getBusesByOwner(currentUser.id);
+      // Use the new available buses endpoint for assignment
+      // This automatically filters out buses already assigned to other managers
+      // and respects role-based access (admin gets all available buses, owner gets their own available buses)
+      // Only shows buses that are not currently assigned to any manager
+      // When editing a user, pass their ID to include their currently assigned buses
+      const busesData = await BusService.getAvailableBusesForAssignment(excludeUserId);
       
       // Transform to match our interface and filter active buses
-      const ownerBuses = busesData
+      const availableBuses = busesData
         .filter(bus => bus.status === 'active')
         .map(bus => ({
           _id: bus._id,
@@ -59,12 +72,12 @@ export default function UsersPage() {
           isActive: bus.status === 'active'
         }));
       
-      setBuses(ownerBuses);
+      setBuses(availableBuses);
     } catch (error) {
-      console.error('Error fetching owner buses:', error);
-      // Set empty array if API fails - no fallback mock data since we want owner-specific buses
+      console.error('Error fetching available buses:', error);
+      // Set empty array if API fails
       setBuses([]);
-      setError('Failed to load your buses. Please try again.');
+      setError('Failed to load available buses. Please try again.');
     }
   };
 
@@ -737,11 +750,16 @@ function AddUserModal({ onClose, onSuccess, buses }: { onClose: () => void; onSu
 
 // Edit User Modal Component
 function EditUserModal({ user, onClose, onSuccess, buses }: { user: User; onClose: () => void; onSuccess: () => void; buses: Bus[] }) {
+  // Handle assignedBuses - could be array of IDs or populated objects
+  const assignedBusIds = (user.assignedBuses || []).map((bus: any) => 
+    typeof bus === 'string' ? bus : bus._id
+  );
+
   const [formData, setFormData] = useState({
     username: user.username,
     role: user.role as BackendUserRole,
     isActive: user.isActive,
-    assignedBuses: user.assignedBuses || []
+    assignedBuses: assignedBusIds
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

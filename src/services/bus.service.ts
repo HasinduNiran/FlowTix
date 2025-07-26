@@ -105,5 +105,16 @@ export const BusService = {
       console.error(`Error updating bus status for bus ${busId}:`, error);
       throw error;
     }
+  },
+
+  async getAvailableBusesForAssignment(excludeUserId?: string): Promise<Bus[]> {
+    try {
+      const params = excludeUserId ? `?excludeUser=${excludeUserId}` : '';
+      const response = await api.get(`/buses/available-for-assignment${params}`);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error fetching available buses for assignment:', error);
+      throw error;
+    }
   }
 }; 
