@@ -47,7 +47,8 @@ export default function ManagerRouteSectionsPage() {
   const [routeSections, setRouteSections] = useState<ManagerRouteSection[]>([]);
   const [managerRoutes, setManagerRoutes] = useState<ManagerRoute[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<string>('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Changed to false initially
+  const [loadingRoutes, setLoadingRoutes] = useState(true); // Added separate loading for routes
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Check permissions - only managers should access this page
@@ -62,24 +63,30 @@ export default function ManagerRouteSectionsPage() {
     if (!user?.id) return;
 
     try {
+      setLoadingRoutes(true);
       const routes = await ManagerService.getRoutesByManager();
       setManagerRoutes(routes);
     } catch (error) {
       console.error('Error fetching manager routes:', error);
       setToast({ message: 'Failed to load your assigned routes', type: 'error' });
+    } finally {
+      setLoadingRoutes(false);
     }
   }, [user?.id]);
 
-  const fetchRouteSections = useCallback(async () => {
-    if (!user?.id) return;
+  const fetchRouteSections = useCallback(async (routeId: string) => {
+    if (!user?.id || !routeId) return;
 
     try {
       setLoading(true);
-      const sections = await ManagerService.getRouteSectionsByManager();
+      // Fetch sections for specific route only
+      const sections = await ManagerService.getRouteSectionsByRouteId(routeId);
       setRouteSections(sections);
+      setToast({ message: 'Route sections loaded successfully', type: 'success' });
     } catch (error) {
       console.error('Error fetching route sections:', error);
       setToast({ message: 'Failed to load route sections', type: 'error' });
+      setRouteSections([]);
     } finally {
       setLoading(false);
     }
@@ -88,14 +95,21 @@ export default function ManagerRouteSectionsPage() {
   useEffect(() => {
     if (user?.role === 'manager') {
       fetchManagerRoutes();
-      fetchRouteSections();
     }
-  }, [user, fetchManagerRoutes, fetchRouteSections]);
+  }, [user, fetchManagerRoutes]);
 
-  // Filter route sections by selected route
-  const filteredRouteSections = selectedRoute 
-    ? routeSections.filter(section => section.routeId._id === selectedRoute)
-    : routeSections;
+  // Handle route selection change
+  const handleRouteChange = (routeId: string) => {
+    setSelectedRoute(routeId);
+    setRouteSections([]); // Clear previous sections
+    
+    if (routeId) {
+      fetchRouteSections(routeId);
+    }
+  };
+
+  // No filter needed since we only load sections for selected route
+  const filteredRouteSections = routeSections;
 
   // Only show the page if user is a manager
   if (user && user.role !== 'manager') {
@@ -116,7 +130,7 @@ export default function ManagerRouteSectionsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">My Route Sections</h1>
           <p className="text-gray-600 mt-1">
-            View route sections and fare structures for all your assigned bus routes
+            Select a route to view its sections and fare structures. Route sections will only load after you select a specific route.
           </p>
         </div>
       </div>
@@ -125,31 +139,44 @@ export default function ManagerRouteSectionsPage() {
       {managerRoutes.length > 0 && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="flex items-center space-x-4">
-            <label className="text-sm font-medium text-gray-700">Filter by Route:</label>
+            <label className="text-sm font-medium text-gray-700">Select Route to View Sections:</label>
             <select
               value={selectedRoute}
-              onChange={(e) => setSelectedRoute(e.target.value)}
+              onChange={(e) => handleRouteChange(e.target.value)}
               className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="">All Routes</option>
+              <option value="">-- Select a Route --</option>
               {managerRoutes.map(route => (
                 <option key={route._id} value={route._id}>
                   {route.code || route.routeNumber} - {route.name || route.routeName}
                 </option>
               ))}
             </select>
+            {selectedRoute && (
+              <span className="text-sm text-green-600 font-medium">
+                ✓ {routeSections.length} sections loaded
+              </span>
+            )}
           </div>
         </div>
       )}
 
       {/* No Routes Message */}
-      {managerRoutes.length === 0 && !loading && (
+      {managerRoutes.length === 0 && !loadingRoutes && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
           <span className="text-6xl mb-4 block">🚌</span>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">No Routes Assigned</h3>
           <p className="text-gray-500 mb-6">
             You don't have any buses assigned to routes yet. Contact your administrator to get bus routes assigned.
           </p>
+        </div>
+      )}
+
+      {/* Loading Routes */}
+      {loadingRoutes && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="mt-2 text-gray-600">Loading your assigned routes...</p>
         </div>
       )}
 
@@ -160,7 +187,15 @@ export default function ManagerRouteSectionsPage() {
             <h2 className="text-lg font-semibold text-gray-900">Route Sections</h2>
           </div>
 
-          {loading ? (
+          {!selectedRoute ? (
+            <div className="p-8 text-center">
+              <span className="text-4xl mb-4 block">🛣️</span>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Select a Route</h3>
+              <p className="text-gray-500">
+                Please select a route from the dropdown above to view its sections and fare structure.
+              </p>
+            </div>
+          ) : loading ? (
             <div className="p-8 text-center">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
               <p className="mt-2 text-gray-600">Loading route sections...</p>
@@ -170,9 +205,7 @@ export default function ManagerRouteSectionsPage() {
               <span className="text-4xl mb-4 block">📍</span>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No Route Sections</h3>
               <p className="text-gray-500">
-                {selectedRoute 
-                  ? 'No route sections found for the selected route.' 
-                  : 'No route sections have been configured yet.'}
+                No route sections have been configured for the selected route yet.
               </p>
             </div>
           ) : (

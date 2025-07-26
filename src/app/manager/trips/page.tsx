@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { ManagerService } from '@/services/manager.service';
-import { Toast } from '@/components/ui/Toast';
 
 interface Trip {
   id: string;
@@ -23,37 +21,12 @@ export default function ManagerTripsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<'all' | 'today' | 'week' | 'month'>('today');
-  const [toast, setToast] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    type: 'success' | 'error' | 'warning' | 'info';
-  }>({
-    isOpen: false,
-    title: '',
-    message: '',
-    type: 'info'
-  });
-
-  const showToast = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
-    setToast({ isOpen: true, title, message, type });
-  };
-
-  const closeToast = () => {
-    setToast(prev => ({ ...prev, isOpen: false }));
-  };
 
   useEffect(() => {
     const fetchTrips = async () => {
       try {
-        setLoading(true);
-        const tripsData = await ManagerService.getTrips();
-        
-        if (tripsData && Array.isArray(tripsData)) {
-          setTrips(tripsData);
-          showToast('Success', 'Trips loaded successfully', 'success');
-        } else {
-          // Fallback data
+        // In real implementation, fetch only trips for the assigned bus
+        setTimeout(() => {
           const mockTrips: Trip[] = [
             {
               id: 'T001',
@@ -101,40 +74,11 @@ export default function ManagerTripsPage() {
             }
           ];
           setTrips(mockTrips);
-          showToast('Info', 'Using sample data - connect to backend for real trips', 'info');
-        }
+          setLoading(false);
+        }, 1000);
       } catch (error) {
         console.error('Error fetching trips:', error);
         setError('Failed to load trips data');
-        showToast('Error', 'Failed to load trips data', 'error');
-        
-        // Show fallback data on error
-        const mockTrips: Trip[] = [
-          {
-            id: 'T001',
-            routeName: 'Colombo - Kandy',
-            startTime: '06:00',
-            endTime: '10:30',
-            status: 'completed',
-            ticketsSold: 42,
-            revenue: 12600,
-            conductor: 'John Silva',
-            date: '2025-01-26'
-          },
-          {
-            id: 'T002',
-            routeName: 'Kandy - Colombo',
-            startTime: '11:00',
-            endTime: '15:30',
-            status: 'completed',
-            ticketsSold: 38,
-            revenue: 11400,
-            conductor: 'John Silva',
-            date: '2025-01-26'
-          }
-        ];
-        setTrips(mockTrips);
-      } finally {
         setLoading(false);
       }
     };
@@ -365,15 +309,6 @@ export default function ManagerTripsPage() {
           </div>
         </div>
       </div>
-
-      {/* Toast Notification */}
-      <Toast
-        isOpen={toast.isOpen}
-        onClose={closeToast}
-        title={toast.title}
-        message={toast.message}
-        type={toast.type}
-      />
     </div>
   );
 }

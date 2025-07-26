@@ -258,6 +258,43 @@ export const ManagerService = {
     }
   },
 
+  // Get route sections for a specific route ID
+  async getRouteSectionsByRouteId(routeId: string): Promise<Array<{
+    _id: string;
+    routeId: {
+      _id: string;
+      routeName: string;
+      routeNumber: string;
+      startPoint: string;
+      endPoint: string;
+      distance: number;
+      estimatedDuration: number;
+      isActive: boolean;
+    };
+    stopId: {
+      _id: string;
+      stopCode: string;
+      stopName: string;
+      sectionNumber: number;
+      isActive: boolean;
+    };
+    category: string;
+    fare: number;
+    order: number;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+  }>> {
+    try {
+      // Use the dedicated route sections API to get sections for specific route
+      const response = await api.get(`/route-sections/route/${routeId}`);
+      return response.data.data || [];
+    } catch (error) {
+      console.error(`Error fetching route sections for route ${routeId}:`, error);
+      throw error;
+    }
+  },
+
   // Get route sections for manager's assigned buses (multiple buses support)
   async getRouteSectionsByManager(): Promise<Array<{
     _id: string;
