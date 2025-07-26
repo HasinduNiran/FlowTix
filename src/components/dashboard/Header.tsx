@@ -2,18 +2,28 @@
 
 import { useState } from 'react';
 import { User } from '@/types/auth';
+import { Menu } from 'lucide-react';
 
 interface HeaderProps {
   user: User | null;
+  onMobileMenuToggle?: () => void;
 }
 
-export default function Header({ user }: HeaderProps) {
+export default function Header({ user, onMobileMenuToggle }: HeaderProps) {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
   return (
     <header className="bg-white shadow-sm z-10">
       <div className="flex items-center justify-between h-16 px-4">
-        <div>
+        <div className="flex items-center space-x-4">
+          {/* Mobile Menu Button */}
+          <button
+            className="md:hidden p-2 rounded-lg text-gray-600 hover:text-gray-800 hover:bg-gray-100 focus:outline-none transition-colors duration-200"
+            onClick={onMobileMenuToggle}
+          >
+            <Menu className="w-7 h-7" strokeWidth={1.5} />
+          </button>
+          
           <h1 className="text-xl font-semibold text-gray-800">
             {user?.role === 'super-admin' ? 'Admin Dashboard' : 'Bus Owner Dashboard'}
           </h1>

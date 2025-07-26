@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import Sidebar from '@/components/dashboard/Sidebar';
@@ -13,6 +13,7 @@ export default function ManagerLayout({
 }) {
   const { user, loading, isAuthenticated } = useAuth();
   const router = useRouter();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && (!isAuthenticated || user?.role !== 'manager')) {
@@ -34,9 +35,16 @@ export default function ManagerLayout({
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <Sidebar role="manager" />
+      <Sidebar 
+        role="manager" 
+        mobileMenuOpen={mobileMenuOpen}
+        onMobileMenuClose={() => setMobileMenuOpen(false)}
+      />
       <div className="flex flex-col flex-1 overflow-hidden">
-        <Header user={user} />
+        <Header 
+          user={user} 
+          onMobileMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
+        />
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
           {children}
         </main>

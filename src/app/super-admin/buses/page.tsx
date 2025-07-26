@@ -20,6 +20,7 @@ export default function BusesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
   const router = useRouter();
   const { user } = useAuth();
 
@@ -156,6 +157,103 @@ export default function BusesPage() {
     }
   ];
 
+  // Card View Component
+  const BusCard = ({ bus }: { bus: Bus }) => {
+    const category = busCategories.find(c => c.key === bus.category);
+    
+    const colorClasses = {
+      blue: 'from-blue-500 to-blue-600',
+      green: 'from-green-500 to-green-600',
+      purple: 'from-purple-500 to-purple-600',
+      orange: 'from-orange-500 to-orange-600',
+      red: 'from-red-500 to-red-600',
+      indigo: 'from-indigo-500 to-indigo-600'
+    };
+
+    const statusColorClasses = {
+      active: 'bg-green-100 text-green-800 border-green-200',
+      inactive: 'bg-red-100 text-red-800 border-red-200'
+    };
+
+    return (
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+        {/* Card Header with Gradient */}
+        <div className={`bg-gradient-to-r ${category ? colorClasses[category.color as keyof typeof colorClasses] : 'from-gray-500 to-gray-600'} p-6 text-white`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <span className="text-3xl">{category?.icon || '🚌'}</span>
+              <div>
+                <h3 className="text-xl font-bold">{bus.busNumber}</h3>
+                <p className="text-white/80 text-sm">{bus.busName}</p>
+              </div>
+            </div>
+            <div className={`px-3 py-1 rounded-full text-xs font-semibold border ${
+              bus.status === 'active' 
+                ? 'bg-white/20 text-white border-white/30' 
+                : 'bg-red-100 text-red-800 border-red-200'
+            }`}>
+              <div className={`inline-block w-2 h-2 rounded-full mr-2 ${
+                bus.status === 'active' ? 'bg-white' : 'bg-red-500'
+              }`}></div>
+              {bus.status.charAt(0).toUpperCase() + bus.status.slice(1)}
+            </div>
+          </div>
+        </div>
+
+        {/* Card Body */}
+        <div className="p-6">
+          <div className="space-y-4">
+            {/* Category Badge */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-600">Category</span>
+              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                category ? (() => {
+                  const categoryColorClasses = {
+                    blue: 'bg-blue-100 text-blue-800 border border-blue-200',
+                    green: 'bg-green-100 text-green-800 border border-green-200',
+                    purple: 'bg-purple-100 text-purple-800 border border-purple-200',
+                    orange: 'bg-orange-100 text-orange-800 border border-orange-200',
+                    red: 'bg-red-100 text-red-800 border border-red-200',
+                    indigo: 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                  };
+                  return categoryColorClasses[category.color as keyof typeof categoryColorClasses];
+                })() : 'bg-gray-100 text-gray-800 border border-gray-200'
+              }`}>
+                <span className="mr-2">{category?.icon}</span>
+                {category?.label || bus.category}
+              </span>
+            </div>
+
+            {/* Phone Number */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-600">Contact</span>
+              <div className="flex items-center text-gray-700">
+                <svg className="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+                <span className="font-medium">{bus.telephoneNumber}</span>
+              </div>
+            </div>
+
+            {/* Action Button */}
+            <div className="pt-4 border-t border-gray-200">
+              <button 
+                onClick={() => handleViewDetails(bus)}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 px-4 rounded-xl font-medium transition-all duration-200 flex items-center justify-center shadow-lg hover:shadow-xl"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                View Details
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="p-6">
       <div className="mb-6 flex justify-between items-start">
@@ -289,23 +387,82 @@ export default function BusesPage() {
         </div>
       </div>
 
+      {/* View Toggle Buttons */}
+      <div className="mb-6">
+        <div className="flex items-center justify-end">
+          <div className="flex bg-white rounded-xl shadow-lg border border-gray-200 p-1">
+            <button
+              onClick={() => setViewMode('table')}
+              className={`flex items-center justify-center p-3 rounded-lg transition-all duration-200 ${
+                viewMode === 'table'
+                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+              title="Table View"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 6h18m-18 8h18m-18 4h18" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setViewMode('card')}
+              className={`flex items-center justify-center p-3 rounded-lg transition-all duration-200 ${
+                viewMode === 'card'
+                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+              title="Card View"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 0v10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
         </div>
       ) : (
-        <div className="bg-white shadow-lg rounded-2xl overflow-hidden border border-gray-200">
-          <DataTable 
-            data={filteredBuses} 
-            columns={columns} 
-            keyExtractor={(item) => item._id}
-            emptyMessage={
-              activeCategory === 'all' 
-                ? "No buses found" 
-                : `No ${busCategories.find(c => c.key === activeCategory)?.label.toLowerCase()} buses found`
-            }
-          />
-        </div>
+        <>
+          {viewMode === 'table' ? (
+            <div className="bg-white shadow-lg rounded-2xl overflow-hidden border border-gray-200">
+              <DataTable 
+                data={filteredBuses} 
+                columns={columns} 
+                keyExtractor={(item) => item._id}
+                emptyMessage={
+                  activeCategory === 'all' 
+                    ? "No buses found" 
+                    : `No ${busCategories.find(c => c.key === activeCategory)?.label.toLowerCase()} buses found`
+                }
+              />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredBuses.length > 0 ? (
+                filteredBuses.map((bus) => (
+                  <BusCard key={bus._id} bus={bus} />
+                ))
+              ) : (
+                <div className="col-span-full flex flex-col items-center justify-center py-16 text-gray-500">
+                  <svg className="w-16 h-16 mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 0v10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                  </svg>
+                  <p className="text-lg font-medium">
+                    {activeCategory === 'all' 
+                      ? "No buses found" 
+                      : `No ${busCategories.find(c => c.key === activeCategory)?.label.toLowerCase()} buses found`
+                    }
+                  </p>
+                  <p className="text-sm mt-2">Start by adding a new bus to the system</p>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
