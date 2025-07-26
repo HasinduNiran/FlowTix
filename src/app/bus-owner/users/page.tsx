@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { UserService } from '@/services/user.service';
+import { BackendUser, BackendUserRole } from '@/types/auth';
 
 interface User {
-  id: string;
+  _id: string;
   username: string;
-  email: string;
   role: 'manager' | 'conductor';
   isActive: boolean;
   createdAt: string;
@@ -16,52 +17,64 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'manager' | 'conductor'>('all');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        // Simulate API call - replace with actual backend call
-        setTimeout(() => {
-          const mockData: User[] = [
-            {
-              id: '1',
-              username: 'john_manager',
-              email: 'john@example.com',
-              role: 'manager',
-              isActive: true,
-              createdAt: '2025-01-15',
-              assignedBuses: ['B001', 'B002'],
-            },
-            {
-              id: '2',
-              username: 'mike_conductor',
-              email: 'mike@example.com',
-              role: 'conductor',
-              isActive: true,
-              createdAt: '2025-01-10',
-              assignedBuses: ['B001'],
-            },
-            {
-              id: '3',
-              username: 'sarah_conductor',
-              email: 'sarah@example.com',
-              role: 'conductor',
-              isActive: false,
-              createdAt: '2025-01-05',
-              assignedBuses: ['B003'],
-            },
-          ];
-          setUsers(mockData);
-          setLoading(false);
-        }, 1000);
-      } catch (error) {
-        console.error('Error fetching users:', error);
-        setLoading(false);
-      }
-    };
-
     fetchUsers();
   }, []);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const backendUsers = await UserService.getAllUsers();
+      
+      // Filter to only show managers and conductors (not admins or owners)
+      const filteredUsers = backendUsers
+        .filter(user => user.role === 'manager' || user.role === 'conductor')
+        .map(user => ({
+          _id: user._id,
+          username: user.username,
+          role: user.role as 'manager' | 'conductor',
+          isActive: user.isActive,
+          createdAt: user.createdAt,
+          assignedBuses: user.assignedBuses || []
+        }));
+      
+      setUsers(filteredUsers);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      setError('Failed to load users. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleStatus = async (userId: string, currentStatus: boolean) => {
+    try {
+      await UserService.toggleUserStatus(userId, !currentStatus);
+      await fetchUsers(); // Refresh the list
+    } catch (error) {
+      console.error('Error toggling user status:', error);
+      setError('Failed to update user status. Please try again.');
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('Are you sure you want to delete this user?')) {
+      return;
+    }
+    
+    try {
+      await UserService.deleteUser(userId);
+      await fetchUsers(); // Refresh the list
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      setError('Failed to delete user. Please try again.');
+    }
+  };
 
   const filteredUsers = users.filter(user => 
     filter === 'all' || user.role === filter
@@ -88,6 +101,19 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
+      {/* Error Alert */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          {error}
+          <button 
+            onClick={() => setError(null)}
+            className="ml-2 text-red-500 hover:text-red-700"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex justify-between items-center">
@@ -97,7 +123,10 @@ export default function UsersPage() {
               Manage your staff members and their access
             </p>
           </div>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium">
+          <button 
+            onClick={() => setShowAddModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium"
+          >
             Add New User
           </button>
         </div>
@@ -165,7 +194,7 @@ export default function UsersPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
+                  <tr key={user._id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <span className="text-2xl mr-3">👤</span>
@@ -174,7 +203,7 @@ export default function UsersPage() {
                             {user.username}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {user.email}
+                            {user._id}
                           </div>
                         </div>
                       </div>
@@ -202,15 +231,27 @@ export default function UsersPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex space-x-2">
-                        <button className="text-blue-600 hover:text-blue-900 px-3 py-1 text-sm border border-blue-600 rounded">
+                        <button 
+                          onClick={() => setEditingUser(user)}
+                          className="text-blue-600 hover:text-blue-900 px-3 py-1 text-sm border border-blue-600 rounded"
+                        >
                           Edit
                         </button>
-                        <button className={`px-3 py-1 text-sm border rounded ${
-                          user.isActive 
-                            ? 'text-red-600 hover:text-red-900 border-red-600'
-                            : 'text-green-600 hover:text-green-900 border-green-600'
-                        }`}>
+                        <button 
+                          onClick={() => handleToggleStatus(user._id, user.isActive)}
+                          className={`px-3 py-1 text-sm border rounded ${
+                            user.isActive 
+                              ? 'text-red-600 hover:text-red-900 border-red-600'
+                              : 'text-green-600 hover:text-green-900 border-green-600'
+                          }`}
+                        >
                           {user.isActive ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteUser(user._id)}
+                          className="text-red-600 hover:text-red-900 px-3 py-1 text-sm border border-red-600 rounded"
+                        >
+                          Delete
                         </button>
                       </div>
                     </td>
@@ -220,6 +261,230 @@ export default function UsersPage() {
             </table>
           </div>
         )}
+      </div>
+
+      {/* Add User Modal */}
+      {showAddModal && (
+        <AddUserModal 
+          onClose={() => setShowAddModal(false)}
+          onSuccess={() => {
+            setShowAddModal(false);
+            fetchUsers();
+          }}
+        />
+      )}
+
+      {/* Edit User Modal */}
+      {editingUser && (
+        <EditUserModal 
+          user={editingUser}
+          onClose={() => setEditingUser(null)}
+          onSuccess={() => {
+            setEditingUser(null);
+            fetchUsers();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Add User Modal Component
+function AddUserModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const [formData, setFormData] = useState({
+    username: '',
+    password: '',
+    role: 'conductor' as BackendUserRole,
+    assignedBuses: [] as string[]
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.username.trim() || !formData.password.trim()) {
+      setError('Username and password are required');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      await UserService.createUser(formData);
+      onSuccess();
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      setError(error.response?.data?.message || 'Failed to create user');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <h2 className="text-xl font-bold mb-4">Add New User</h2>
+        
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Username</label>
+            <input
+              type="text"
+              value={formData.username}
+              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Password</label>
+            <input
+              type="password"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Role</label>
+            <select
+              value={formData.role}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value as BackendUserRole })}
+              className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+            >
+              <option value="manager">Manager</option>
+              <option value="conductor">Conductor</option>
+            </select>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+              disabled={loading}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              disabled={loading}
+            >
+              {loading ? 'Creating...' : 'Create User'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Edit User Modal Component
+function EditUserModal({ user, onClose, onSuccess }: { user: User; onClose: () => void; onSuccess: () => void }) {
+  const [formData, setFormData] = useState({
+    username: user.username,
+    role: user.role as BackendUserRole,
+    isActive: user.isActive,
+    assignedBuses: user.assignedBuses || []
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.username.trim()) {
+      setError('Username is required');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      await UserService.updateUser(user._id, formData);
+      onSuccess();
+    } catch (error: any) {
+      console.error('Error updating user:', error);
+      setError(error.response?.data?.message || 'Failed to update user');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <h2 className="text-xl font-bold mb-4">Edit User</h2>
+        
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Username</label>
+            <input
+              type="text"
+              value={formData.username}
+              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Role</label>
+            <select
+              value={formData.role}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value as BackendUserRole })}
+              className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+            >
+              <option value="manager">Manager</option>
+              <option value="conductor">Conductor</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={formData.isActive}
+                onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                className="rounded border-gray-300 text-blue-600 mr-2"
+              />
+              <span className="text-sm font-medium text-gray-700">Active</span>
+            </label>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+              disabled={loading}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              disabled={loading}
+            >
+              {loading ? 'Updating...' : 'Update User'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
