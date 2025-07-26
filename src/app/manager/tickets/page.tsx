@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { ManagerService } from '@/services/manager.service';
+import { Toast } from '@/components/ui/Toast';
 
 interface Ticket {
   id: string;
@@ -24,12 +26,54 @@ export default function ManagerTicketsPage() {
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<'all' | 'today' | 'week'>('today');
   const [statusFilter, setStatusFilter] = useState<'all' | 'booked' | 'used' | 'cancelled'>('all');
+  const [toast, setToast] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
+
+  const showToast = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    setToast({ isOpen: true, title, message, type });
+  };
+
+  const closeToast = () => {
+    setToast(prev => ({ ...prev, isOpen: false }));
+  };
 
   useEffect(() => {
     const fetchTickets = async () => {
       try {
-        // In real implementation, fetch only tickets for the assigned bus
-        setTimeout(() => {
+        setLoading(true);
+        const ticketsData = await ManagerService.getTickets({
+          status: statusFilter === 'all' ? undefined : statusFilter,
+          dateRange: filter === 'all' ? undefined : filter
+        });
+        
+        if (ticketsData && Array.isArray(ticketsData)) {
+          // Transform backend data to frontend format
+          const transformedTickets = ticketsData.map((ticket: any) => ({
+            id: ticket._id || ticket.ticketNumber,
+            passengerName: ticket.passengerName,
+            fromStop: ticket.fromStopName || ticket.fromStop,
+            toStop: ticket.toStopName || ticket.toStop,
+            price: ticket.price,
+            tripId: ticket.tripId,
+            routeName: ticket.routeName || 'N/A',
+            seatNumber: ticket.seatNumber,
+            bookingTime: ticket.bookingTime || ticket.createdAt,
+            status: ticket.status,
+            paymentMethod: ticket.paymentMethod
+          }));
+          setTickets(transformedTickets);
+          showToast('Success', 'Tickets loaded successfully', 'success');
+        } else {
+          // Fallback data
           const mockTickets: Ticket[] = [
             {
               id: 'TKT001',
@@ -98,11 +142,31 @@ export default function ManagerTicketsPage() {
             }
           ];
           setTickets(mockTickets);
-          setLoading(false);
-        }, 1000);
+          showToast('Info', 'Using sample data - connect to backend for real tickets', 'info');
+        }
       } catch (error) {
         console.error('Error fetching tickets:', error);
         setError('Failed to load tickets data');
+        showToast('Error', 'Failed to load tickets data', 'error');
+        
+        // Show fallback data on error
+        const mockTickets: Ticket[] = [
+          {
+            id: 'TKT001',
+            passengerName: 'Kamal Perera',
+            fromStop: 'Colombo Fort',
+            toStop: 'Kandy',
+            price: 300,
+            tripId: 'T001',
+            routeName: 'Colombo - Kandy',
+            seatNumber: 'A1',
+            bookingTime: '2025-01-26 05:45:00',
+            status: 'used',
+            paymentMethod: 'cash'
+          }
+        ];
+        setTickets(mockTickets);
+      } finally {
         setLoading(false);
       }
     };
@@ -379,6 +443,15 @@ export default function ManagerTicketsPage() {
           </div>
         </div>
       </div>
+
+      {/* Toast Notification */}
+      <Toast
+        isOpen={toast.isOpen}
+        onClose={closeToast}
+        title={toast.title}
+        message={toast.message}
+        type={toast.type}
+      />
     </div>
   );
 }

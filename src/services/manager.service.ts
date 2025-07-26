@@ -120,13 +120,24 @@ export interface MonthlyFee {
 }
 
 export const ManagerService = {
-  // Get manager's assigned bus
+  // Get manager's assigned bus (for backward compatibility)
   async getAssignedBus(): Promise<ManagerBus> {
     try {
       const response = await api.get('/auth/manager/bus');
       return response.data.data;
     } catch (error) {
       console.error('Error fetching assigned bus:', error);
+      throw error;
+    }
+  },
+
+  // Get all assigned buses for the manager
+  async getAssignedBuses(): Promise<ManagerBus[]> {
+    try {
+      const response = await api.get('/auth/manager/buses');
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error fetching assigned buses:', error);
       throw error;
     }
   },
@@ -164,6 +175,145 @@ export const ManagerService = {
       return response.data.data;
     } catch (error) {
       console.error('Error fetching recent activities:', error);
+      throw error;
+    }
+  },
+
+  // Get route for manager's assigned bus
+  async getRoute(): Promise<{
+    _id: string;
+    routeName: string;
+    routeNumber: string;
+    startLocation?: string;
+    endLocation?: string;
+  }> {
+    try {
+      const response = await api.get('/auth/manager/routes');
+      return response.data.data;
+    } catch (error) {
+      console.error('Error fetching route:', error);
+      throw error;
+    }
+  },
+
+  // Get all routes (for route selector)
+  async getRoutes(): Promise<Array<{
+    _id: string;
+    routeName: string;
+    routeNumber: string;
+    startLocation?: string;
+    endLocation?: string;
+  }>> {
+    try {
+      // First try to get the manager's assigned route
+      const assignedRoute = await this.getRoute();
+      return [assignedRoute];
+    } catch (error) {
+      console.error('Error fetching routes:', error);
+      throw error;
+    }
+  },
+
+  // Get routes for manager's assigned buses (multiple buses support)
+  async getRoutesByManager(): Promise<Array<{
+    _id: string;
+    name: string;
+    code: string;
+    routeName: string;
+    routeNumber: string;
+    startLocation?: string;
+    endLocation?: string;
+  }>> {
+    try {
+      // Get all assigned buses for the manager
+      const busesResponse = await api.get('/auth/manager/buses');
+      const buses = busesResponse.data.data || [];
+      
+      if (!buses || buses.length === 0) {
+        return [];
+      }
+      
+      // Extract unique routes from all assigned buses
+      const routesMap = new Map();
+      
+      buses.forEach((bus: any) => {
+        if (bus.routeId) {
+          const route = {
+            _id: bus.routeId._id,
+            name: bus.routeId.routeName || bus.routeId.name,
+            code: bus.routeId.routeNumber || bus.routeId.code,
+            routeName: bus.routeId.routeName,
+            routeNumber: bus.routeId.routeNumber,
+            startLocation: bus.routeId.startLocation || bus.routeId.startPoint,
+            endLocation: bus.routeId.endLocation || bus.routeId.endPoint
+          };
+          routesMap.set(route._id, route);
+        }
+      });
+      
+      return Array.from(routesMap.values());
+    } catch (error) {
+      console.error('Error fetching routes by manager:', error);
+      throw error;
+    }
+  },
+
+  // Get route sections for manager's assigned buses (multiple buses support)
+  async getRouteSectionsByManager(): Promise<Array<{
+    _id: string;
+    routeId: {
+      _id: string;
+      routeName: string;
+      routeNumber: string;
+      startPoint: string;
+      endPoint: string;
+      distance: number;
+      estimatedDuration: number;
+      isActive: boolean;
+    };
+    stopId: {
+      _id: string;
+      stopCode: string;
+      stopName: string;
+      sectionNumber: number;
+      isActive: boolean;
+    };
+    category: string;
+    fare: number;
+    order: number;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+  }>> {
+    try {
+      // Get all assigned buses for the manager
+      const busesResponse = await api.get('/auth/manager/buses');
+      const buses = busesResponse.data.data || [];
+      
+      if (!buses || buses.length === 0) {
+        return [];
+      }
+      
+      // Get unique route IDs from all assigned buses
+      const routeIds = [...new Set(buses.map((bus: any) => bus.routeId?._id).filter(Boolean))];
+      
+      // Fetch route sections for all routes
+      const allRouteSections: any[] = [];
+      
+      for (const routeId of routeIds) {
+        try {
+          const response = await api.get(`/route-sections/route/${routeId}`);
+          const sections = response.data.data || [];
+          allRouteSections.push(...sections);
+        } catch (error) {
+          console.error(`Error fetching sections for route ${routeId}:`, error);
+          // Continue with other routes even if one fails
+        }
+      }
+      
+      return allRouteSections;
+    } catch (error) {
+      console.error('Error fetching route sections by manager:', error);
       throw error;
     }
   },
@@ -326,17 +476,6 @@ export const ManagerService = {
       return response.data.data;
     } catch (error) {
       console.error(`Error rejecting expense ${expenseId}:`, error);
-      throw error;
-    }
-  },
-
-  // Get route sections for assigned bus route
-  async getRouteSections(): Promise<RouteSection[]> {
-    try {
-      const response = await api.get('/manager/route-sections');
-      return response.data.data;
-    } catch (error) {
-      console.error('Error fetching route sections:', error);
       throw error;
     }
   },

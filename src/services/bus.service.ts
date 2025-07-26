@@ -27,7 +27,7 @@ export interface Bus {
   seatCapacity: number;
   driverName: string;
   conductorId: string | User;
-  status: 'active' | 'inactive';
+  status: 'active' | 'inactive' | 'maintenance';
   notes?: string;
   lastDayEndDate?: string;
   resetTripCounter?: boolean;
@@ -97,7 +97,7 @@ export const BusService = {
     }
   },
 
-  async updateBusStatus(busId: string, status: 'active' | 'inactive'): Promise<Bus> {
+  async updateBusStatus(busId: string, status: 'active' | 'inactive' | 'maintenance'): Promise<Bus> {
     try {
       const response = await api.put(`/buses/${busId}`, { status });
       return response.data.data;

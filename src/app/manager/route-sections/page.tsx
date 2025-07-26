@@ -1,319 +1,262 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { ManagerService } from '@/services/manager.service';
+import { Toast } from '@/components/ui/Toast';
 
-interface RouteSection {
-  id: string;
+interface ManagerRoute {
+  _id: string;
+  name: string;
+  code: string;
   routeName: string;
-  fromStop: string;
-  toStop: string;
-  distance: number;
-  basePrice: number;
-  estimatedTime: number;
-  status: 'active' | 'inactive';
-  busId: string;
+  routeNumber: string;
+  startLocation?: string;
+  endLocation?: string;
+}
+
+interface ManagerRouteSection {
+  _id: string;
+  routeId: {
+    _id: string;
+    routeName: string;
+    routeNumber: string;
+    startPoint: string;
+    endPoint: string;
+    distance: number;
+    estimatedDuration: number;
+    isActive: boolean;
+  };
+  stopId: {
+    _id: string;
+    stopCode: string;
+    stopName: string;
+    sectionNumber: number;
+    isActive: boolean;
+  };
+  category: string;
+  fare: number;
+  order: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export default function ManagerRouteSectionsPage() {
   const { user } = useAuth();
-  const [routeSections, setRouteSections] = useState<RouteSection[]>([]);
+  const [routeSections, setRouteSections] = useState<ManagerRouteSection[]>([]);
+  const [managerRoutes, setManagerRoutes] = useState<ManagerRoute[]>([]);
+  const [selectedRoute, setSelectedRoute] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Check permissions - only managers should access this page
+  useEffect(() => {
+    if (user && user.role !== 'manager') {
+      setToast({ message: 'Access denied. Only managers can access this page.', type: 'error' });
+      return;
+    }
+  }, [user]);
+
+  const fetchManagerRoutes = useCallback(async () => {
+    if (!user?.id) return;
+
+    try {
+      const routes = await ManagerService.getRoutesByManager();
+      setManagerRoutes(routes);
+    } catch (error) {
+      console.error('Error fetching manager routes:', error);
+      setToast({ message: 'Failed to load your assigned routes', type: 'error' });
+    }
+  }, [user?.id]);
+
+  const fetchRouteSections = useCallback(async () => {
+    if (!user?.id) return;
+
+    try {
+      setLoading(true);
+      const sections = await ManagerService.getRouteSectionsByManager();
+      setRouteSections(sections);
+    } catch (error) {
+      console.error('Error fetching route sections:', error);
+      setToast({ message: 'Failed to load route sections', type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
-    const fetchRouteSections = async () => {
-      try {
-        // In real implementation, fetch only route sections for the assigned bus
-        setTimeout(() => {
-          const mockRouteSections: RouteSection[] = [
-            {
-              id: 'RS001',
-              routeName: 'Colombo - Kandy Express',
-              fromStop: 'Colombo Fort',
-              toStop: 'Pettah',
-              distance: 3.2,
-              basePrice: 50,
-              estimatedTime: 15,
-              status: 'active',
-              busId: 'B001'
-            },
-            {
-              id: 'RS002',
-              routeName: 'Colombo - Kandy Express',
-              fromStop: 'Pettah',
-              toStop: 'Maradana',
-              distance: 2.8,
-              basePrice: 40,
-              estimatedTime: 12,
-              status: 'active',
-              busId: 'B001'
-            },
-            {
-              id: 'RS003',
-              routeName: 'Colombo - Kandy Express',
-              fromStop: 'Maradana',
-              toStop: 'Kelaniya',
-              distance: 8.5,
-              basePrice: 80,
-              estimatedTime: 25,
-              status: 'active',
-              busId: 'B001'
-            },
-            {
-              id: 'RS004',
-              routeName: 'Colombo - Kandy Express',
-              fromStop: 'Kelaniya',
-              toStop: 'Gampaha',
-              distance: 12.4,
-              basePrice: 120,
-              estimatedTime: 35,
-              status: 'active',
-              busId: 'B001'
-            },
-            {
-              id: 'RS005',
-              routeName: 'Colombo - Kandy Express',
-              fromStop: 'Gampaha',
-              toStop: 'Veyangoda',
-              distance: 15.3,
-              basePrice: 150,
-              estimatedTime: 40,
-              status: 'active',
-              busId: 'B001'
-            },
-            {
-              id: 'RS006',
-              routeName: 'Colombo - Kandy Express',
-              fromStop: 'Veyangoda',
-              toStop: 'Peradeniya',
-              distance: 45.2,
-              basePrice: 220,
-              estimatedTime: 90,
-              status: 'active',
-              busId: 'B001'
-            },
-            {
-              id: 'RS007',
-              routeName: 'Colombo - Kandy Express',
-              fromStop: 'Peradeniya',
-              toStop: 'Kandy',
-              distance: 8.1,
-              basePrice: 80,
-              estimatedTime: 20,
-              status: 'active',
-              busId: 'B001'
-            }
-          ];
-          setRouteSections(mockRouteSections);
-          setLoading(false);
-        }, 1000);
-      } catch (error) {
-        console.error('Error fetching route sections:', error);
-        setError('Failed to load route sections');
-        setLoading(false);
-      }
-    };
-
-    fetchRouteSections();
-  }, []);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'inactive':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+    if (user?.role === 'manager') {
+      fetchManagerRoutes();
+      fetchRouteSections();
     }
-  };
+  }, [user, fetchManagerRoutes, fetchRouteSections]);
 
-  if (loading) {
+  // Filter route sections by selected route
+  const filteredRouteSections = selectedRoute 
+    ? routeSections.filter(section => section.routeId._id === selectedRoute)
+    : routeSections;
+
+  // Only show the page if user is a manager
+  if (user && user.role !== 'manager') {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h2>
+          <p className="text-gray-600">Only managers can access this page.</p>
+        </div>
       </div>
     );
   }
-
-  if (error) {
-    return (
-      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-        {error}
-      </div>
-    );
-  }
-
-  const totalDistance = routeSections.reduce((sum, section) => sum + section.distance, 0);
-  const totalTime = routeSections.reduce((sum, section) => sum + section.estimatedTime, 0);
-  const avgPrice = routeSections.length > 0 ? routeSections.reduce((sum, section) => sum + section.basePrice, 0) / routeSections.length : 0;
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
+      {/* Header */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Route Sections</h1>
-        <p className="text-gray-600">
-          View route sections and pricing for your assigned bus route.
-        </p>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-blue-100">
-              <span className="text-2xl">🗺️</span>
-            </div>
-            <div className="ml-4">
-              <h3 className="text-sm font-medium text-gray-500">Total Sections</h3>
-              <p className="text-2xl font-semibold text-gray-900">{routeSections.length}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-green-100">
-              <span className="text-2xl">📏</span>
-            </div>
-            <div className="ml-4">
-              <h3 className="text-sm font-medium text-gray-500">Total Distance</h3>
-              <p className="text-2xl font-semibold text-gray-900">{totalDistance.toFixed(1)} km</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-purple-100">
-              <span className="text-2xl">⏰</span>
-            </div>
-            <div className="ml-4">
-              <h3 className="text-sm font-medium text-gray-500">Total Time</h3>
-              <p className="text-2xl font-semibold text-gray-900">{Math.round(totalTime / 60)}h {totalTime % 60}m</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-yellow-100">
-              <span className="text-2xl">💰</span>
-            </div>
-            <div className="ml-4">
-              <h3 className="text-sm font-medium text-gray-500">Avg Section Price</h3>
-              <p className="text-2xl font-semibold text-gray-900">LKR {Math.round(avgPrice)}</p>
-            </div>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">My Route Sections</h1>
+          <p className="text-gray-600 mt-1">
+            View route sections and fare structures for all your assigned bus routes
+          </p>
         </div>
       </div>
+
+      {/* Route Filter */}
+      {managerRoutes.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="flex items-center space-x-4">
+            <label className="text-sm font-medium text-gray-700">Filter by Route:</label>
+            <select
+              value={selectedRoute}
+              onChange={(e) => setSelectedRoute(e.target.value)}
+              className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">All Routes</option>
+              {managerRoutes.map(route => (
+                <option key={route._id} value={route._id}>
+                  {route.code || route.routeNumber} - {route.name || route.routeName}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* No Routes Message */}
+      {managerRoutes.length === 0 && !loading && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <span className="text-6xl mb-4 block">🚌</span>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Routes Assigned</h3>
+          <p className="text-gray-500 mb-6">
+            You don't have any buses assigned to routes yet. Contact your administrator to get bus routes assigned.
+          </p>
+        </div>
+      )}
 
       {/* Route Sections List */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Route Section Details</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Section
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  From - To
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Distance
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Base Price
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Est. Time
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Price per km
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {routeSections.map((section, index) => (
-                <tr key={section.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-800 font-semibold text-sm mr-3">
-                        {index + 1}
-                      </div>
-                      <div className="text-sm font-medium text-gray-900">{section.id}</div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm text-gray-900">
-                      <div className="font-medium">{section.fromStop}</div>
-                      <div className="text-gray-500 flex items-center">
-                        <span className="mr-1">↓</span>
-                        {section.toStop}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {section.distance.toFixed(1)} km
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    LKR {section.basePrice}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {section.estimatedTime} min
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    LKR {(section.basePrice / section.distance).toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(section.status)}`}>
-                      {section.status.charAt(0).toUpperCase() + section.status.slice(1)}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Route Map Visualization */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Route Visualization</h2>
-        <div className="relative">
-          {/* This would typically be a map component */}
-          <div className="bg-gray-50 rounded-lg p-8 text-center">
-            <div className="flex flex-col space-y-4">
-              {routeSections.map((section, index) => (
-                <div key={section.id} className="flex items-center">
-                  <div className="flex-1">
-                    <div className="flex items-center">
-                      <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
-                      <div className="flex-1 h-1 bg-blue-200 mx-2"></div>
-                      <div className="text-sm font-medium text-gray-700">
-                        {section.fromStop} → {section.toStop}
-                      </div>
-                      <div className="flex-1 h-1 bg-blue-200 mx-2"></div>
-                      <div className="text-sm text-gray-500">
-                        {section.distance}km | LKR {section.basePrice}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+      {managerRoutes.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">Route Sections</h2>
           </div>
+
+          {loading ? (
+            <div className="p-8 text-center">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <p className="mt-2 text-gray-600">Loading route sections...</p>
+            </div>
+          ) : filteredRouteSections.length === 0 ? (
+            <div className="p-8 text-center">
+              <span className="text-4xl mb-4 block">📍</span>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Route Sections</h3>
+              <p className="text-gray-500">
+                {selectedRoute 
+                  ? 'No route sections found for the selected route.' 
+                  : 'No route sections have been configured yet.'}
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Route
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Stop
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Category
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Fare (LKR)
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Order
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredRouteSections
+                    .sort((a, b) => a.order - b.order)
+                    .map((section) => (
+                    <tr key={section._id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {section.routeId.routeNumber}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {section.routeId.routeName}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {section.stopId.stopName}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            Code: {section.stopId.stopCode}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                          {section.category.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {section.fare.toFixed(2)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {section.order}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          section.isActive 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {section.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {/* Manager Access Notice */}
       <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
@@ -327,6 +270,18 @@ export default function ManagerRouteSectionsPage() {
           </div>
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          isOpen={true}
+          title={toast.type === 'success' ? 'Success' : 'Error'}
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+          duration={5000}
+        />
+      )}
     </div>
   );
 }
