@@ -23,6 +23,7 @@ export default function OwnerExpensesPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
   
   // Confirmation Modal states
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -276,28 +277,28 @@ export default function OwnerExpensesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <div className="bg-white shadow-lg rounded-2xl p-8 border border-gray-200">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
-              <div className="flex items-center mb-6 md:mb-0">
-                <div className="bg-gradient-to-br from-blue-100 to-indigo-100 p-4 rounded-2xl mr-6">
-                  <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="mb-6 sm:mb-8">
+          <div className="bg-white shadow-lg rounded-2xl p-6 sm:p-8 border border-gray-200">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+              <div className="flex items-center">
+                <div className="bg-gradient-to-br from-blue-100 to-indigo-100 p-3 sm:p-4 rounded-2xl mr-4 sm:mr-6">
+                  <svg className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                   </svg>
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2">My Expenses</h1>
-                  <p className="text-gray-600">Track and manage expenses for your buses</p>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">My Expenses</h1>
+                  <p className="text-gray-600 text-sm sm:text-base">Track and manage expenses for your buses</p>
                 </div>
               </div>
-              <div className="flex space-x-3">
+              <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
                 <Button 
                   onClick={() => router.push('/bus-owner/expenses/types/create')}
                   variant="secondary"
-                  className="bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 hover:from-blue-100 hover:to-indigo-100 border-blue-200"
+                  className="bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 hover:from-blue-100 hover:to-indigo-100 border-blue-200 w-full sm:w-auto"
                 >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -306,7 +307,7 @@ export default function OwnerExpensesPage() {
                 </Button>
                 <Button 
                   onClick={() => router.push('/bus-owner/expenses/transactions/create')}
-                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg transition-all duration-200"
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg transition-all duration-200 w-full sm:w-auto"
                 >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -320,46 +321,49 @@ export default function OwnerExpensesPage() {
 
         {/* Tab Navigation */}
         <div className="mb-6">
-          <div className="bg-white shadow-lg rounded-2xl p-2 border border-gray-200">
-            <div className="flex space-x-1">
+          <div className="bg-white shadow-lg rounded-2xl p-1 sm:p-2 border border-gray-200">
+            <div className="flex flex-col sm:flex-row sm:space-x-1 space-y-1 sm:space-y-0">
               <button
                 onClick={() => setActiveTab('overview')}
-                className={`flex-1 flex items-center justify-center px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
+                className={`flex-1 flex items-center justify-center px-4 sm:px-6 py-3 rounded-xl font-medium transition-all duration-200 text-sm sm:text-base ${
                   activeTab === 'overview'
                     ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
                 }`}
               >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
-                Overview
+                <span className="hidden sm:inline">Overview</span>
+                <span className="sm:hidden">Overview</span>
               </button>
               <button
                 onClick={() => setActiveTab('types')}
-                className={`flex-1 flex items-center justify-center px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
+                className={`flex-1 flex items-center justify-center px-4 sm:px-6 py-3 rounded-xl font-medium transition-all duration-200 text-sm sm:text-base ${
                   activeTab === 'types'
                     ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
                 }`}
               >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                 </svg>
-                Expense Types ({expenseTypes.length})
+                <span className="hidden sm:inline">Expense Types ({expenseTypes.length})</span>
+                <span className="sm:hidden">Types ({expenseTypes.length})</span>
               </button>
               <button
                 onClick={() => setActiveTab('transactions')}
-                className={`flex-1 flex items-center justify-center px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
+                className={`flex-1 flex items-center justify-center px-4 sm:px-6 py-3 rounded-xl font-medium transition-all duration-200 text-sm sm:text-base ${
                   activeTab === 'transactions'
                     ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
                 }`}
               >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
-                Transactions ({expenseTransactions.length})
+                <span className="hidden sm:inline">Transactions ({expenseTransactions.length})</span>
+                <span className="sm:hidden">Trans ({expenseTransactions.length})</span>
               </button>
             </div>
           </div>
@@ -378,11 +382,11 @@ export default function OwnerExpensesPage() {
         {activeTab === 'overview' && (
           <div className="space-y-6">
             {/* Bus Selection */}
-            <div className="bg-white shadow-lg rounded-2xl border border-gray-200 p-6">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
+            <div className="bg-white shadow-lg rounded-2xl border border-gray-200 p-4 sm:p-6">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center space-y-4 lg:space-y-0">
                 <h3 className="text-lg font-semibold text-gray-900">Select Bus for Overview</h3>
-                <div className="flex items-center space-x-3">
-                  <div className="relative">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full lg:w-auto">
+                  <div className="relative flex-1 lg:flex-none">
                     <input
                       type="text"
                       value={busSearchTerm}
@@ -397,7 +401,7 @@ export default function OwnerExpensesPage() {
                         setTimeout(() => setShowBusSuggestions(false), 200);
                       }}
                       placeholder="Type bus number..."
-                      className="w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                      className="w-full lg:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                     />
 
                     {/* Bus suggestions dropdown */}
@@ -457,59 +461,59 @@ export default function OwnerExpensesPage() {
 
             {/* Statistics Cards - Show only when bus is selected */}
             {selectedBusId ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-200">
                   <div className="flex items-center">
-                    <div className="bg-green-100 p-3 rounded-xl">
-                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="bg-green-100 p-2 sm:p-3 rounded-xl">
+                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                       </svg>
                     </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-500">Total Expenses</p>
-                      <p className="text-2xl font-bold text-gray-900">Rs. {getFilteredTotalExpenses().toLocaleString()}</p>
+                    <div className="ml-3 sm:ml-4">
+                      <p className="text-xs sm:text-sm font-medium text-gray-500">Total Expenses</p>
+                      <p className="text-lg sm:text-2xl font-bold text-gray-900">Rs. {getFilteredTotalExpenses().toLocaleString()}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-200">
+                <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-200">
                   <div className="flex items-center">
-                    <div className="bg-blue-100 p-3 rounded-xl">
-                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="bg-blue-100 p-2 sm:p-3 rounded-xl">
+                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                       </svg>
                     </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-500">Transactions</p>
-                      <p className="text-2xl font-bold text-gray-900">{getFilteredTransactions().length}</p>
+                    <div className="ml-3 sm:ml-4">
+                      <p className="text-xs sm:text-sm font-medium text-gray-500">Transactions</p>
+                      <p className="text-lg sm:text-2xl font-bold text-gray-900">{getFilteredTransactions().length}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-200">
+                <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-200">
                   <div className="flex items-center">
-                    <div className="bg-purple-100 p-3 rounded-xl">
-                      <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="bg-purple-100 p-2 sm:p-3 rounded-xl">
+                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                       </svg>
                     </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-500">Expense Types</p>
-                      <p className="text-2xl font-bold text-gray-900">{getFilteredExpenseTypes().length}</p>
+                    <div className="ml-3 sm:ml-4">
+                      <p className="text-xs sm:text-sm font-medium text-gray-500">Expense Types</p>
+                      <p className="text-lg sm:text-2xl font-bold text-gray-900">{getFilteredExpenseTypes().length}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-200">
+                <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-200">
                   <div className="flex items-center">
-                    <div className="bg-orange-100 p-3 rounded-xl">
-                      <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="bg-orange-100 p-2 sm:p-3 rounded-xl">
+                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                       </svg>
                     </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-500">Average</p>
-                      <p className="text-2xl font-bold text-gray-900">
+                    <div className="ml-3 sm:ml-4">
+                      <p className="text-xs sm:text-sm font-medium text-gray-500">Average</p>
+                      <p className="text-lg sm:text-2xl font-bold text-gray-900">
                         Rs. {getFilteredTransactions().length > 0 ? (getFilteredTotalExpenses() / getFilteredTransactions().length).toFixed(2) : '0.00'}
                       </p>
                     </div>
@@ -587,10 +591,47 @@ export default function OwnerExpensesPage() {
         {/* Expense Types Tab */}
         {activeTab === 'types' && (
           <div className="bg-white shadow-lg rounded-2xl border border-gray-200 overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
-                <h3 className="text-xl font-bold text-gray-900">Your Expense Types</h3>
-                <div className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-3">
+            <div className="p-4 sm:p-6 border-b border-gray-200">
+              <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center space-y-4 xl:space-y-0">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between w-full xl:w-auto gap-4">
+                  <h3 className="text-lg sm:text-xl font-bold text-gray-900">Your Expense Types</h3>
+                  
+                  {/* Enhanced View Toggle Buttons */}
+                  {expenseTypes.length > 0 && (
+                    <div className="relative">
+                      <div className="flex bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-1.5 shadow-sm">
+                        <button
+                          onClick={() => setViewMode('table')}
+                          className={`flex items-center px-4 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300 transform ${
+                            viewMode === 'table'
+                              ? 'bg-white text-blue-700 shadow-lg scale-105 border border-blue-200'
+                              : 'text-blue-600 hover:text-blue-800 hover:bg-white/50'
+                          }`}
+                        >
+                          <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M3 3h18v18H3V3zm2 2v14h14V5H5zm2 2h10v2H7V7zm0 4h10v2H7v-2zm0 4h10v2H7v-2z"/>
+                          </svg>
+                          Table
+                        </button>
+                        <button
+                          onClick={() => setViewMode('card')}
+                          className={`flex items-center px-4 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300 transform ${
+                            viewMode === 'card'
+                              ? 'bg-white text-blue-700 shadow-lg scale-105 border border-blue-200'
+                              : 'text-blue-600 hover:text-blue-800 hover:bg-white/50'
+                          }`}
+                        >
+                          <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm8-2h8v8h-8v-8zm2 2v4h4v-4h-4z"/>
+                          </svg>
+                          Cards
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 w-full xl:w-auto">
                   {/* Bus selection */}
                   <div className="relative">
                     <input
@@ -607,7 +648,7 @@ export default function OwnerExpensesPage() {
                         setTimeout(() => setShowBusSuggestions(false), 200);
                       }}
                       placeholder="Filter by bus number..."
-                      className="w-48 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                      className="w-full sm:w-48 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                     />
 
                     {/* Bus suggestions dropdown */}
@@ -663,84 +704,182 @@ export default function OwnerExpensesPage() {
               </div>
             </div>
             
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Expense Type
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Bus
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {(selectedBusId ? getFilteredExpenseTypes() : expenseTypes)
-                    .filter(type => 
-                      type.expenseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                      type.description.toLowerCase().includes(searchTerm.toLowerCase())
-                    ).map((type) => (
-                    <tr key={type._id} className="hover:bg-gray-50 transition-colors duration-200">
-                      <td className="px-6 py-4 whitespace-nowrap">
+            {viewMode === 'table' ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Expense Type
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                        Bus
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {(selectedBusId ? getFilteredExpenseTypes() : expenseTypes)
+                      .filter(type => 
+                        type.expenseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        type.description.toLowerCase().includes(searchTerm.toLowerCase())
+                      ).map((type) => (
+                      <tr key={type._id} className="hover:bg-gray-50 transition-colors duration-200">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{type.expenseName}</div>
+                            <div className="text-sm text-gray-500">{type.description}</div>
+                            <div className="sm:hidden text-xs text-gray-400 mt-1">
+                              Bus: {typeof type.busId === 'object' && type.busId ? type.busId.busNumber : 'N/A'}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 hidden sm:table-cell">
+                          {typeof type.busId === 'object' && type.busId ? type.busId.busNumber : 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex flex-col sm:flex-row justify-end space-y-1 sm:space-y-0 sm:space-x-2">
+                            <button
+                              onClick={() => router.push(`/bus-owner/expenses/types/${type._id}`)}
+                              className="group relative p-2 sm:p-3 text-gray-500 hover:text-blue-600 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 rounded-xl transition-all duration-300 transform hover:scale-110 hover:shadow-md"
+                              title="View Details"
+                            >
+                              <svg className="w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 616 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => router.push(`/bus-owner/expenses/types/${type._id}/edit`)}
+                              className="group relative p-2 sm:p-3 text-gray-500 hover:text-emerald-600 hover:bg-gradient-to-r hover:from-emerald-50 hover:to-green-100 rounded-xl transition-all duration-300 transform hover:scale-110 hover:shadow-md"
+                              title="Edit Type"
+                            >
+                              <svg className="w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteExpenseType(type._id)}
+                              className="group relative p-2 sm:p-3 text-gray-500 hover:text-red-600 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-100 rounded-xl transition-all duration-300 transform hover:scale-110 hover:shadow-md"
+                              title="Delete Type"
+                            >
+                              <svg className="w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {(selectedBusId ? getFilteredExpenseTypes() : expenseTypes)
+                  .filter(type => 
+                    type.expenseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    type.description.toLowerCase().includes(searchTerm.toLowerCase())
+                  ).map((type) => (
+                  <div key={type._id} className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-all duration-300 hover:border-blue-300">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center">
+                        <span className="text-2xl mr-3">🏷️</span>
                         <div>
-                          <div className="text-sm font-medium text-gray-900">{type.expenseName}</div>
-                          <div className="text-sm text-gray-500">{type.description}</div>
+                          <h4 className="font-semibold text-gray-900 text-lg">
+                            {type.expenseName}
+                          </h4>
+                          <p className="text-sm text-gray-500">
+                            {type.description}
+                          </p>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {typeof type.busId === 'object' && type.busId ? type.busId.busNumber : 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex justify-end space-x-2">
-                          <button
-                            onClick={() => router.push(`/bus-owner/expenses/types/${type._id}`)}
-                            className="group relative p-3 text-gray-500 hover:text-blue-600 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 rounded-xl transition-all duration-300 transform hover:scale-110 hover:shadow-md"
-                            title="View Details"
-                          >
-                            <svg className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 616 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                          </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="bg-blue-50 rounded-lg p-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium text-blue-700">Bus Number</span>
+                          <span className="font-bold text-blue-900">
+                            {typeof type.busId === 'object' && type.busId ? type.busId.busNumber : 'N/A'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col space-y-2 pt-3 border-t border-gray-200">
+                        <button
+                          onClick={() => router.push(`/bus-owner/expenses/types/${type._id}`)}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                        >
+                          View Details
+                        </button>
+                        <div className="grid grid-cols-2 gap-2">
                           <button
                             onClick={() => router.push(`/bus-owner/expenses/types/${type._id}/edit`)}
-                            className="group relative p-3 text-gray-500 hover:text-emerald-600 hover:bg-gradient-to-r hover:from-emerald-50 hover:to-green-100 rounded-xl transition-all duration-300 transform hover:scale-110 hover:shadow-md"
-                            title="Edit Type"
+                            className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                           >
-                            <svg className="w-5 h-5 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
+                            Edit
                           </button>
                           <button
                             onClick={() => handleDeleteExpenseType(type._id)}
-                            className="group relative p-3 text-gray-500 hover:text-red-600 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-100 rounded-xl transition-all duration-300 transform hover:scale-110 hover:shadow-md"
-                            title="Delete Type"
+                            className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                           >
-                            <svg className="w-5 h-5 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
+                            Delete
                           </button>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {/* Transactions Tab */}
         {activeTab === 'transactions' && (
           <div className="bg-white shadow-lg rounded-2xl border border-gray-200 overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
-                <h3 className="text-xl font-bold text-gray-900">Your Expense Transactions</h3>
-                <div className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-3">
+            <div className="p-4 sm:p-6 border-b border-gray-200">
+              <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center space-y-4 xl:space-y-0">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between w-full xl:w-auto gap-4">
+                  <h3 className="text-lg sm:text-xl font-bold text-gray-900">Your Expense Transactions</h3>
+                  
+                  {/* Enhanced View Toggle Buttons */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-1 rounded-lg border border-blue-200 shadow-sm">
+                    <div className="flex">
+                      <button
+                        onClick={() => setViewMode('table')}
+                        className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all duration-300 transform hover:scale-105 ${
+                          viewMode === 'table'
+                            ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md'
+                            : 'text-blue-600 hover:text-blue-800 hover:bg-blue-50'
+                        }`}
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 6h18m-9 8h9" />
+                        </svg>
+                        Table
+                      </button>
+                      <button
+                        onClick={() => setViewMode('card')}
+                        className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all duration-300 transform hover:scale-105 ${
+                          viewMode === 'card'
+                            ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md'
+                            : 'text-blue-600 hover:text-blue-800 hover:bg-blue-50'
+                        }`}
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14-7H5a2 2 0 00-2 2v12a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2z" />
+                        </svg>
+                        Cards
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 w-full xl:w-auto">
                   {/* Bus selection */}
                   <div className="relative">
                     <input
@@ -757,7 +896,7 @@ export default function OwnerExpensesPage() {
                         setTimeout(() => setShowBusSuggestions(false), 200);
                       }}
                       placeholder="Filter by bus number..."
-                      className="w-48 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                      className="w-full sm:w-48 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                     />
 
                     {/* Bus suggestions dropdown */}
@@ -813,83 +952,158 @@ export default function OwnerExpensesPage() {
               </div>
             </div>
             
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Expense Type
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Notes
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {(selectedBusId ? getFilteredTransactions() : expenseTransactions)
-                    .filter(transaction => 
-                      getExpenseTypeDisplay(transaction.expenseTypeId).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                      (transaction.notes && transaction.notes.toLowerCase().includes(searchTerm.toLowerCase()))
-                    ).map((transaction) => (
-                    <tr key={transaction._id} className="hover:bg-gray-50 transition-colors duration-200">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {new Date(transaction.date).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {getExpenseTypeDisplay(transaction.expenseTypeId)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                        Rs. {transaction.amount.toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
-                        {transaction.notes || 'No notes'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex justify-end space-x-2">
-                          <button
-                            onClick={() => router.push(`/bus-owner/expenses/transactions/${transaction._id}`)}
-                            className="group relative p-3 text-gray-500 hover:text-blue-600 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 rounded-xl transition-all duration-300 transform hover:scale-110 hover:shadow-md"
-                            title="View Details"
-                          >
-                            <svg className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 616 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                          </button>
+            {viewMode === 'table' ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Date & Type
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                        Expense Type
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Amount
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
+                        Notes
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {(selectedBusId ? getFilteredTransactions() : expenseTransactions)
+                      .filter(transaction => 
+                        getExpenseTypeDisplay(transaction.expenseTypeId).toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        (transaction.notes && transaction.notes.toLowerCase().includes(searchTerm.toLowerCase()))
+                      ).map((transaction) => (
+                      <tr key={transaction._id} className="hover:bg-gray-50 transition-colors duration-200">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {new Date(transaction.date).toLocaleDateString()}
+                          </div>
+                          <div className="sm:hidden text-sm text-gray-500 mt-1">
+                            {getExpenseTypeDisplay(transaction.expenseTypeId)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 hidden sm:table-cell">
+                          {getExpenseTypeDisplay(transaction.expenseTypeId)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-green-600">
+                            Rs. {transaction.amount.toLocaleString()}
+                          </div>
+                          <div className="lg:hidden text-xs text-gray-500 mt-1 max-w-xs truncate">
+                            {transaction.notes || 'No notes'}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate hidden lg:table-cell">
+                          {transaction.notes || 'No notes'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex flex-col sm:flex-row justify-end space-y-1 sm:space-y-0 sm:space-x-2">
+                            <button
+                              onClick={() => router.push(`/bus-owner/expenses/transactions/${transaction._id}`)}
+                              className="group relative p-2 sm:p-3 text-gray-500 hover:text-blue-600 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 rounded-xl transition-all duration-300 transform hover:scale-110 hover:shadow-md"
+                              title="View Details"
+                            >
+                              <svg className="w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 616 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => router.push(`/bus-owner/expenses/transactions/${transaction._id}/edit`)}
+                              className="group relative p-2 sm:p-3 text-gray-500 hover:text-emerald-600 hover:bg-gradient-to-r hover:from-emerald-50 hover:to-green-100 rounded-xl transition-all duration-300 transform hover:scale-110 hover:shadow-md"
+                              title="Edit Transaction"
+                            >
+                              <svg className="w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteTransaction(transaction._id)}
+                              className="group relative p-2 sm:p-3 text-gray-500 hover:text-red-600 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-100 rounded-xl transition-all duration-300 transform hover:scale-110 hover:shadow-md"
+                              title="Delete Transaction"
+                            >
+                              <svg className="w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {(selectedBusId ? getFilteredTransactions() : expenseTransactions)
+                  .filter(transaction => 
+                    getExpenseTypeDisplay(transaction.expenseTypeId).toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (transaction.notes && transaction.notes.toLowerCase().includes(searchTerm.toLowerCase()))
+                  ).map((transaction) => (
+                  <div key={transaction._id} className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-all duration-300 hover:border-blue-300">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center">
+                        <span className="text-2xl mr-3">💰</span>
+                        <div>
+                          <h4 className="font-semibold text-gray-900 text-lg">
+                            {getExpenseTypeDisplay(transaction.expenseTypeId)}
+                          </h4>
+                          <p className="text-sm text-gray-500">
+                            {new Date(transaction.date).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="bg-green-50 rounded-lg p-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium text-green-700">Amount</span>
+                          <span className="font-bold text-green-900 text-lg">Rs. {transaction.amount.toLocaleString()}</span>
+                        </div>
+                      </div>
+
+                      {transaction.notes && (
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <span className="text-sm font-medium text-gray-700 block mb-1">Notes:</span>
+                          <p className="text-sm text-gray-600">{transaction.notes}</p>
+                        </div>
+                      )}
+
+                      <div className="flex flex-col space-y-2 pt-3 border-t border-gray-200">
+                        <button
+                          onClick={() => router.push(`/bus-owner/expenses/transactions/${transaction._id}`)}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                        >
+                          View Details
+                        </button>
+                        <div className="grid grid-cols-2 gap-2">
                           <button
                             onClick={() => router.push(`/bus-owner/expenses/transactions/${transaction._id}/edit`)}
-                            className="group relative p-3 text-gray-500 hover:text-emerald-600 hover:bg-gradient-to-r hover:from-emerald-50 hover:to-green-100 rounded-xl transition-all duration-300 transform hover:scale-110 hover:shadow-md"
-                            title="Edit Transaction"
+                            className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                           >
-                            <svg className="w-5 h-5 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
+                            Edit
                           </button>
                           <button
                             onClick={() => handleDeleteTransaction(transaction._id)}
-                            className="group relative p-3 text-gray-500 hover:text-red-600 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-100 rounded-xl transition-all duration-300 transform hover:scale-110 hover:shadow-md"
-                            title="Delete Transaction"
+                            className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                           >
-                            <svg className="w-5 h-5 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
+                            Delete
                           </button>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
