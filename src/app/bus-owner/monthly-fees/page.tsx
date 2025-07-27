@@ -15,6 +15,7 @@ export default function MonthlyFeesPage() {
   const [selectedBus, setSelectedBus] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -198,22 +199,22 @@ export default function MonthlyFeesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex justify-between items-center">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Monthly Fees</h1>
-            <p className="text-gray-600 mt-1">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Monthly Fees</h1>
+            <p className="text-gray-600 mt-1 text-sm sm:text-base">
               Manage monthly fees for your buses created by admin
             </p>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
             <div className="text-sm text-gray-500">
               Total Fees: <span className="font-semibold text-gray-900">{pagination.total}</span>
             </div>
             <button 
               onClick={() => fetchMonthlyFees(pagination.currentPage)}
               disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base"
             >
               {loading ? 'Loading...' : 'Refresh'}
             </button>
@@ -222,8 +223,8 @@ export default function MonthlyFeesPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Bus Filter */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Bus</label>
@@ -302,13 +303,13 @@ export default function MonthlyFeesPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="flex items-center">
             <span className="text-2xl mr-3">📄</span>
             <div>
               <p className="text-sm font-medium text-gray-600">Total Fees</p>
-              <p className="text-2xl font-bold text-gray-900">{pagination.total}</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900">{pagination.total}</p>
             </div>
           </div>
         </div>
@@ -317,7 +318,7 @@ export default function MonthlyFeesPage() {
             <span className="text-2xl mr-3">💰</span>
             <div>
               <p className="text-sm font-medium text-gray-600">Total Amount</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-xl sm:text-2xl font-bold text-gray-900">
                 LKR {monthlyFees.reduce((sum, fee) => sum + fee.amount, 0).toLocaleString()}
               </p>
             </div>
@@ -328,7 +329,7 @@ export default function MonthlyFeesPage() {
             <span className="text-2xl mr-3">✅</span>
             <div>
               <p className="text-sm font-medium text-gray-600">Paid Amount</p>
-              <p className="text-2xl font-bold text-green-600">
+              <p className="text-xl sm:text-2xl font-bold text-green-600">
                 LKR {monthlyFees.reduce((sum, fee) => sum + fee.paidAmount, 0).toLocaleString()}
               </p>
             </div>
@@ -339,7 +340,7 @@ export default function MonthlyFeesPage() {
             <span className="text-2xl mr-3">⏳</span>
             <div>
               <p className="text-sm font-medium text-gray-600">Outstanding</p>
-              <p className="text-2xl font-bold text-red-600">
+              <p className="text-xl sm:text-2xl font-bold text-red-600">
                 LKR {monthlyFees.reduce((sum, fee) => sum + (fee.amount - fee.paidAmount), 0).toLocaleString()}
               </p>
             </div>
@@ -349,10 +350,44 @@ export default function MonthlyFeesPage() {
 
       {/* Monthly Fees List */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h3 className="text-lg font-semibold text-gray-900">
             Monthly Fee Records ({monthlyFees.length})
           </h3>
+          
+          {/* Enhanced View Toggle Buttons */}
+          {monthlyFees.length > 0 && (
+            <div className="relative">
+              <div className="flex bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-1.5 shadow-sm">
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`flex items-center px-4 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300 transform ${
+                    viewMode === 'table'
+                      ? 'bg-white text-blue-700 shadow-lg scale-105 border border-blue-200'
+                      : 'text-blue-600 hover:text-blue-800 hover:bg-white/50'
+                  }`}
+                >
+                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M3 3h18v18H3V3zm2 2v14h14V5H5zm2 2h10v2H7V7zm0 4h10v2H7v-2zm0 4h10v2H7v-2z"/>
+                  </svg>
+                  Table
+                </button>
+                <button
+                  onClick={() => setViewMode('card')}
+                  className={`flex items-center px-4 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300 transform ${
+                    viewMode === 'card'
+                      ? 'bg-white text-blue-700 shadow-lg scale-105 border border-blue-200'
+                      : 'text-blue-600 hover:text-blue-800 hover:bg-white/50'
+                  }`}
+                >
+                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm8-2h8v8h-8v-8zm2 2v4h4v-4h-4z"/>
+                  </svg>
+                  Cards
+                </button>
+              </div>
+            </div>
+          )}
         </div>
         
         {monthlyFees.length === 0 ? (
@@ -365,7 +400,7 @@ export default function MonthlyFeesPage() {
               No monthly fees have been created by the admin for your buses yet.
             </p>
           </div>
-        ) : (
+        ) : viewMode === 'table' ? (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
@@ -373,13 +408,13 @@ export default function MonthlyFeesPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Fee Details
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
                     Bus Information
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Amount Details
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
                     Payment Info
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -403,6 +438,9 @@ export default function MonthlyFeesPage() {
                           <div className="text-sm text-gray-500">
                             Created: {formatDate(fee.createdAt)}
                           </div>
+                          <div className="md:hidden text-sm text-gray-500 mt-1">
+                            {getBusDisplay(fee.busId)}
+                          </div>
                           {fee.notes && (
                             <div className="text-xs text-gray-400 mt-1">
                               {fee.notes}
@@ -411,7 +449,7 @@ export default function MonthlyFeesPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4 whitespace-nowrap hidden md:table-cell">
                       <div className="text-sm text-gray-900">
                         {getBusDisplay(fee.busId)}
                       </div>
@@ -428,8 +466,11 @@ export default function MonthlyFeesPage() {
                           Outstanding: LKR {(fee.amount - fee.paidAmount).toLocaleString()}
                         </div>
                       )}
+                      <div className="lg:hidden text-sm text-gray-500 mt-1">
+                        {fee.paymentDate ? formatDate(fee.paymentDate) : 'Not paid'}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4 whitespace-nowrap hidden lg:table-cell">
                       <div className="text-sm text-gray-900">
                         {fee.paymentDate ? formatDate(fee.paymentDate) : 'Not paid'}
                       </div>
@@ -440,17 +481,17 @@ export default function MonthlyFeesPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex space-x-2">
+                      <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-1 sm:space-y-0">
                         {fee.status === 'paid' && (
                           <button
                             onClick={() => handleDownloadBill(fee)}
                             disabled={downloadingId === fee._id}
-                            className="text-green-600 hover:text-green-900 px-3 py-1 text-sm border border-green-600 rounded disabled:opacity-50"
+                            className="text-green-600 hover:text-green-900 px-3 py-1 text-sm border border-green-600 rounded disabled:opacity-50 whitespace-nowrap"
                           >
                             {downloadingId === fee._id ? 'Downloading...' : 'Download Bill'}
                           </button>
                         )}
-                        <button className="text-blue-600 hover:text-blue-900 px-3 py-1 text-sm border border-blue-600 rounded">
+                        <button className="text-blue-600 hover:text-blue-900 px-3 py-1 text-sm border border-blue-600 rounded whitespace-nowrap">
                           View Details
                         </button>
                       </div>
@@ -460,15 +501,88 @@ export default function MonthlyFeesPage() {
               </tbody>
             </table>
           </div>
+        ) : (
+          <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {monthlyFees.map((fee) => (
+              <div key={fee._id} className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-all duration-300 hover:border-blue-300">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center">
+                    <span className="text-3xl mr-3">📄</span>
+                    <div>
+                      <h4 className="font-semibold text-gray-900 text-lg">
+                        {formatMonth(fee.month)}
+                      </h4>
+                      <p className="text-sm text-gray-500">
+                        {getBusDisplay(fee.busId)}
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getStatusBadge(fee.status)}`}>
+                    {getStatusDisplay(fee.status)}
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="bg-blue-50 rounded-lg p-3">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium text-blue-700">Total Amount</span>
+                      <span className="font-bold text-blue-900">LKR {fee.amount.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium text-green-700">Paid Amount</span>
+                      <span className="font-bold text-green-900">LKR {fee.paidAmount.toLocaleString()}</span>
+                    </div>
+                    {fee.amount !== fee.paidAmount && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-red-700">Outstanding</span>
+                        <span className="font-bold text-red-900">LKR {(fee.amount - fee.paidAmount).toLocaleString()}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-sm text-gray-600">
+                    <div className="flex justify-between py-1">
+                      <span>Created:</span>
+                      <span>{formatDate(fee.createdAt)}</span>
+                    </div>
+                    <div className="flex justify-between py-1">
+                      <span>Payment Date:</span>
+                      <span>{fee.paymentDate ? formatDate(fee.paymentDate) : 'Not paid'}</span>
+                    </div>
+                    {fee.notes && (
+                      <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
+                        <span className="font-medium">Notes:</span> {fee.notes}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col space-y-2 pt-3 border-t border-gray-200">
+                    {fee.status === 'paid' && (
+                      <button
+                        onClick={() => handleDownloadBill(fee)}
+                        disabled={downloadingId === fee._id}
+                        className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                      >
+                        {downloadingId === fee._id ? 'Downloading...' : 'Download Bill'}
+                      </button>
+                    )}
+                    <button className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                      View Details
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
 
         {/* Pagination */}
         {pagination.totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-            <div className="text-sm text-gray-500">
+          <div className="px-4 sm:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="text-sm text-gray-500 text-center sm:text-left">
               Showing {((pagination.currentPage - 1) * pagination.limit) + 1} to {Math.min(pagination.currentPage * pagination.limit, pagination.total)} of {pagination.total} fees
             </div>
-            <div className="flex space-x-2">
+            <div className="flex justify-center sm:justify-end space-x-2">
               <button
                 onClick={() => fetchMonthlyFees(pagination.currentPage - 1)}
                 disabled={pagination.currentPage <= 1 || loading}

@@ -387,46 +387,57 @@ export default function BusesPage() {
         </div>
       </div>
 
-      {/* View Toggle Buttons */}
-      <div className="mb-6">
-        <div className="flex items-center justify-end">
-          <div className="flex bg-white rounded-xl shadow-lg border border-gray-200 p-1">
-            <button
-              onClick={() => setViewMode('table')}
-              className={`flex items-center justify-center p-3 rounded-lg transition-all duration-200 ${
-                viewMode === 'table'
-                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-              }`}
-              title="Table View"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 6h18m-18 8h18m-18 4h18" />
-              </svg>
-            </button>
-            <button
-              onClick={() => setViewMode('card')}
-              className={`flex items-center justify-center p-3 rounded-lg transition-all duration-200 ${
-                viewMode === 'card'
-                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-              }`}
-              title="Card View"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 0v10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
         </div>
       ) : (
         <>
+          {/* Buses Data Section Header */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Bus Fleet ({filteredBuses.length})
+                </h3>
+                
+                {/* Enhanced View Toggle Buttons */}
+                {filteredBuses.length > 0 && (
+                  <div className="relative">
+                    <div className="flex bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-1.5 shadow-sm">
+                      <button
+                        onClick={() => setViewMode('table')}
+                        className={`flex items-center px-4 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300 transform ${
+                          viewMode === 'table'
+                            ? 'bg-white text-blue-700 shadow-lg scale-105 border border-blue-200'
+                            : 'text-blue-600 hover:text-blue-800 hover:bg-white/50'
+                        }`}
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M3 3h18v18H3V3zm2 2v14h14V5H5zm2 2h10v2H7V7zm0 4h10v2H7v-2zm0 4h10v2H7v-2z"/>
+                        </svg>
+                        Table View
+                      </button>
+                      <button
+                        onClick={() => setViewMode('card')}
+                        className={`flex items-center px-4 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300 transform ${
+                          viewMode === 'card'
+                            ? 'bg-white text-blue-700 shadow-lg scale-105 border border-blue-200'
+                            : 'text-blue-600 hover:text-blue-800 hover:bg-white/50'
+                        }`}
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm8-2h8v8h-8v-8zm2 2v4h4v-4h-4z"/>
+                        </svg>
+                        Card View
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
           {viewMode === 'table' ? (
             <div className="bg-white shadow-lg rounded-2xl overflow-hidden border border-gray-200">
               <DataTable 

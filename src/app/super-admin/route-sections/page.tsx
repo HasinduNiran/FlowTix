@@ -26,33 +26,6 @@ function RouteSectionsManager() {
   const [filterRoute, setFilterRoute] = useState('');
   const [sortBy, setSortBy] = useState<'route' | 'order' | 'fare' | 'createdAt'>('order');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [generating, setGenerating] = useState(false);
-  const [showGenerateModal, setShowGenerateModal] = useState(false);
-  const [generateFormData, setGenerateFormData] = useState({
-    routeId: '',
-    category: 'normal',
-    fareMultiplier: 1.0,
-    overwriteExisting: false
-  });  // Pagination state
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 15, // Changed to 15 items per page as requested
-    total: 0,
-    totalPages: 0
-  });
-
-  // Toast state
-  const [toast, setToast] = useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    type: 'success' | 'error' | 'warning' | 'info';
-  }>({
-    isOpen: false,
-    title: '',
-    message: '',
-    type: 'info'
-  });
 
   // Form state
   const [formData, setFormData] = useState({
@@ -453,16 +426,20 @@ function RouteSectionsManager() {
       <div className="container mx-auto p-6 max-w-7xl">
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
           {/* Header Section */}
-          <div className="bg-white border-b border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-800 mb-1">Route Sections Management</h1>
-                <p className="text-gray-600 text-sm">
+          <div className="bg-white border-b border-gray-200 p-4 sm:p-6">
+            <div className="flex items-start sm:items-center justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 mb-1 truncate">
+                  Route Sections Management
+                </h1>
+                <p className="text-gray-600 text-xs sm:text-sm lg:text-base leading-relaxed">
                   Manage route sections, assign stops to routes, and configure fare structures
                 </p>
               </div>
-              <div className="text-3xl text-gray-300">
-                🚌
+              <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M19 7h-3V6a2 2 0 0 0-2-2H10a2 2 0 0 0-2 2v1H5a3 3 0 0 0-3 3v6a2 2 0 0 0 2 2h1v1a1 1 0 0 0 2 0v-1h10v1a1 1 0 0 0 2 0v-1h1a2 2 0 0 0 2-2v-6a3 3 0 0 0-3-3zM10 6h4v1h-4V6zm-4 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm12 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
+                </svg>
               </div>
             </div>
           </div>
@@ -470,12 +447,21 @@ function RouteSectionsManager() {
           {/* Content Area */}
           <div className="p-8">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
-
+              <div>
+                <h2 className="text-3xl font-bold text-gray-800 mb-2">
+                  Route Sections
+                </h2>
+                <p className="text-gray-600">
+                  View all route sections or filter by specific route
+                </p>
+              </div>
               
-              <div className="flex items-center gap-4 w-full lg:w-auto">
-                <div className="relative flex-grow lg:w-80">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              {/* Controls Section */}
+              <div className="flex flex-col space-y-3 lg:space-y-0 lg:flex-row lg:items-center lg:space-x-4 w-full lg:w-auto lg:min-w-0">
+                {/* Search Input */}
+                <div className="relative w-full lg:w-72 xl:w-80">
+                  <div className="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">
+                    <svg className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
                     </svg>
                   </div>
@@ -484,94 +470,50 @@ function RouteSectionsManager() {
                     placeholder="Search stops or categories..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-12 pr-4 py-3 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className="pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm sm:text-base"
                   />
                 </div>
                 
                 <div className="relative flex-grow lg:w-80">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                    <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                     </svg>
                   </div>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search routes..."
-                      value={routeSearchTerm}
-                      onChange={(e) => {
-                        setRouteSearchTerm(e.target.value);
-                        setIsRouteDropdownOpen(true);
-                      }}
-                      onFocus={() => setIsRouteDropdownOpen(true)}
-                      onBlur={(e) => {
-                        // Use a slight delay to allow click events to fire before closing dropdown
-                        setTimeout(() => setIsRouteDropdownOpen(false), 200);
-                      }}
-                      className="pl-12 pr-4 py-3 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    />
-                    
-                    {isRouteDropdownOpen && (
-                      <div className="absolute inset-x-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
-                        <div 
-                          className={`p-3 cursor-pointer hover:bg-blue-50 ${filterRoute === '' ? 'bg-blue-50' : ''}`}
-                          onMouseDown={(e) => {
-                            e.preventDefault(); // Prevents blur event from firing first
-                            setFilterRoute('');
-                            setRouteSearchTerm('');
-                            setIsRouteDropdownOpen(false);
-                            // Clear route sections
-                            console.log('Clearing route sections - user must select a route');
-                            setRouteSections([]);
-                          }}
-                        >
-                          <span className="font-medium text-gray-700">Select a Route</span>
-                        </div>
-                        
-                        <div 
-                          className={`p-3 cursor-pointer hover:bg-blue-50 ${filterRoute === 'all' ? 'bg-blue-50' : ''}`}
-                          onMouseDown={(e) => {
-                            e.preventDefault(); // Prevents blur event from firing first
-                            setFilterRoute('all');
-                            setRouteSearchTerm('All Routes');
-                            setIsRouteDropdownOpen(false);
-                            // Fetch all route sections
-                            console.log('Fetching all route sections');
-                            fetchAllRouteSections();
-                          }}
-                        >
-                          <span className="font-medium text-gray-700">All Routes</span>
-                        </div>
-
-                        <div className="border-t border-gray-200"></div>
-                        
-                        {filteredRoutes.map((route) => (
-                          <div 
-                            key={route._id}
-                            className={`p-3 cursor-pointer hover:bg-blue-50 ${filterRoute === route._id ? 'bg-blue-50' : ''}`}
-                            onMouseDown={(e) => {
-                              e.preventDefault(); // Prevents blur event from firing first
-                              setFilterRoute(route._id);
-                              setRouteSearchTerm(`${route.routeNumber || route.code || ''} - ${route.routeName || route.name || ''}`);
-                              setIsRouteDropdownOpen(false);
-                              // Fetch sections for specific route
-                              console.log('Fetching sections for specific route:', route._id);
-                              fetchRouteSections(route._id);
-                            }}
-                          >
-                            <div className="font-medium text-gray-800">
-                              {route.routeNumber || route.code} - {route.routeName || route.name}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              ({(route.startPoint || route.startLocation)} → {(route.endPoint || route.endLocation)})
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <select
+                    value={filterRoute}
+                    onChange={(e) => {
+                      const selectedRoute = e.target.value;
+                      console.log('Route filter changed to:', selectedRoute);
+                      setFilterRoute(selectedRoute);
+                      
+                      if (selectedRoute === '') {
+                        // "Select a Route" - clear route sections
+                        console.log('Clearing route sections - user must select a route');
+                        setRouteSections([]);
+                      } else if (selectedRoute === 'all') {
+                        // "All Routes" selected - fetch all route sections
+                        console.log('Fetching all route sections');
+                        fetchAllRouteSections();
+                      } else {
+                        // Specific route selected - fetch sections for that route only
+                        console.log('Fetching sections for specific route:', selectedRoute);
+                        fetchRouteSections(selectedRoute);
+                      }
+                    }}
+                    className="pl-12 pr-4 py-3 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white appearance-none"
+                  >
+                    <option value="">Select a Route</option>
+                    <option value="all">All Routes</option>
+                    {routes.map((route) => (
+                      <option key={route._id} value={route._id}>
+                        {route.code} - {route.name} ({route.startLocation} → {route.endLocation})
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
+                {/* Add Button */}
                 <button
                   onClick={async () => {
                     resetForm();
@@ -582,12 +524,13 @@ function RouteSectionsManager() {
                     }
                     setShowModal(true);
                   }}
-                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-3 whitespace-nowrap"
+                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 sm:gap-3 whitespace-nowrap text-sm sm:text-base lg:min-w-[180px]"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
                   </svg>
-                  Add Route Section
+                  <span className="hidden sm:inline">Add Route Section</span>
+                  <span className="sm:hidden">Add Section</span>
                 </button>
 
                 <button
@@ -612,16 +555,16 @@ function RouteSectionsManager() {
 
             {/* Sort Controls - Only show when there are route sections */}
             {filteredAndSortedRouteSections.length > 0 && (
-              <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 rounded-full">
-                      <svg className="h-5 w-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+              <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="p-1.5 sm:p-2 bg-blue-100 rounded-full flex-shrink-0">
+                      <svg className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
                       </svg>
                     </div>
                     <p className="text-blue-800 font-medium text-lg">
-                      Showing {pagination.limit === 9999 ? 'all' : Math.min(pagination.limit, totalFiltered)} of {totalFiltered} route {totalFiltered === 1 ? 'section' : 'sections'}
+                      Showing {filteredAndSortedRouteSections.length} route {filteredAndSortedRouteSections.length === 1 ? 'section' : 'sections'}
                       {filterRoute === 'all' ? (
                         <span className="text-blue-600 ml-1">
                           from all routes
@@ -631,11 +574,6 @@ function RouteSectionsManager() {
                           for selected route
                         </span>
                       ) : null}
-                      {pagination.limit !== 9999 && (
-                        <span className="text-blue-600 ml-1">
-                          (Page {pagination.page} of {pagination.totalPages})
-                        </span>
-                      )}
                     </p>
                   </div>
                   <div className="flex items-center gap-4">
@@ -669,7 +607,7 @@ function RouteSectionsManager() {
             )}
 
             {/* Route Sections Table */}
-            {paginatedRouteSections.length > 0 && (
+            {filteredAndSortedRouteSections.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -701,7 +639,7 @@ function RouteSectionsManager() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {paginatedRouteSections.map((routeSection) => (
+                      {filteredAndSortedRouteSections.map((routeSection) => (
                         <tr key={routeSection._id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
@@ -715,20 +653,20 @@ function RouteSectionsManager() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div>
                               <div className="text-sm font-medium text-gray-900">
-                                {routeSection.stopId && routeSection.stopId.stopName ? routeSection.stopId.stopName : 'Unknown Stop'}
+                                {routeSection.stopId.stopName}
                               </div>
                               <div className="text-sm text-gray-500">
-                                Section {routeSection.stopId && routeSection.stopId.sectionNumber ? routeSection.stopId.sectionNumber : 'N/A'}
+                                Section {routeSection.stopId.sectionNumber}
                               </div>
                             </div>
                           </td>
                           {(filterRoute === '' || filterRoute === 'all') && (
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">
-                                {routeSection.routeId && routeSection.routeId.routeName ? routeSection.routeId.routeName : 'Unknown Route'}
+                                {routeSection.routeId.routeName}
                               </div>
                               <div className="text-sm text-gray-500">
-                                {routeSection.routeId && routeSection.routeId.routeNumber ? routeSection.routeId.routeNumber : 'N/A'}
+                                {routeSection.routeId.routeNumber}
                               </div>
                             </td>
                           )}
@@ -1011,7 +949,7 @@ function RouteSectionsManager() {
       {/* Add Route Section Modal */}
       {showModal && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
           style={{ backgroundColor: 'rgba(0, 0, 0, 0.3)' }}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
@@ -1021,23 +959,23 @@ function RouteSectionsManager() {
           }}
         >
           <div 
-            className="bg-white rounded-xl shadow-xl w-full max-w-lg transform transition-all duration-300 ease-out scale-100 max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-xl shadow-xl w-full max-w-sm sm:max-w-md lg:max-w-lg transform transition-all duration-300 ease-out scale-100 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-6 pb-4 border-b border-gray-100">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-800">
+            <div className="flex items-start sm:items-center justify-between p-4 sm:p-6 pb-3 sm:pb-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-xl z-10">
+              <div className="flex-1 min-w-0 pr-4">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-800 leading-tight">
                   {selectedRouteSection ? 'Edit Route Section' : 'Create New Route Section'}
                 </h2>
-                <p className="text-sm text-gray-500 mt-1">Configure route section details</p>
+                <p className="text-xs sm:text-sm text-gray-500 mt-1">Configure route section details</p>
               </div>
               <button 
                 onClick={() => {
                   setShowModal(false);
                   resetForm();
                 }}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200 group"
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200 group flex-shrink-0"
               >
                 <svg className="h-5 w-5 text-gray-400 group-hover:text-gray-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -1046,76 +984,25 @@ function RouteSectionsManager() {
             </div>
             
             {/* Form Content */}
-            <div className="p-6">
-              <form id="routeSectionForm" onSubmit={handleSubmit} className="space-y-5">
+            <div className="p-4 sm:p-6">
+              <form id="routeSectionForm" onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Route
                   </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Search routes..."
-                      value={formData.routeId ? routes.find(r => r._id === formData.routeId) ? 
-                        `${routes.find(r => r._id === formData.routeId)?.routeNumber || routes.find(r => r._id === formData.routeId)?.code || ''} - ${routes.find(r => r._id === formData.routeId)?.routeName || routes.find(r => r._id === formData.routeId)?.name || ''}` 
-                        : '' : formRouteSearchTerm}
-                      onChange={(e) => {
-                        const term = e.target.value;
-                        // Just update the search text, don't change the selection yet
-                        setFormRouteSearchTerm(term);
-                        setIsFormRouteDropdownOpen(true);
-                      }}
-                      onFocus={() => setIsFormRouteDropdownOpen(true)}
-                      onBlur={(e) => {
-                        // Use a slight delay to allow click events to fire before closing dropdown
-                        setTimeout(() => setIsFormRouteDropdownOpen(false), 200);
-                      }}
-                      className="pl-12 pr-4 py-3 w-full rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      required
-                    />
-                    
-                    {isFormRouteDropdownOpen && (
-                      <div className="absolute inset-x-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
-                        <div className="p-3 text-sm text-gray-500 italic">
-                          Select a route to continue
-                        </div>
-                        
-                        <div className="border-t border-gray-200"></div>
-                        
-                        {filteredRoutes.map((route) => (
-                          <div 
-                            key={route._id}
-                            className={`p-3 cursor-pointer hover:bg-blue-50 ${formData.routeId === route._id ? 'bg-blue-50' : ''}`}
-                            onMouseDown={async (e) => {
-                              e.preventDefault(); // Prevents blur event from firing first
-                              setFormData({ ...formData, routeId: route._id, stopId: '' });
-                              setFormRouteSearchTerm('');
-                              setIsFormRouteDropdownOpen(false);
-                              
-                              // Fetch stops for the selected route
-                              if (route._id) {
-                                await fetchStopsByRoute(route._id);
-                              } else {
-                                setFilteredStops([]);
-                              }
-                            }}
-                          >
-                            <div className="font-medium text-gray-800">
-                              {route.routeNumber || route.code} - {route.routeName || route.name}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              ({(route.startPoint || route.startLocation)} → {(route.endPoint || route.endLocation)})
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <select
+                    value={formData.routeId}
+                    onChange={(e) => setFormData({ ...formData, routeId: e.target.value })}
+                    required
+                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
+                  >
+                    <option value="">Select a route</option>
+                    {routes.map((route) => (
+                   <option key={route._id} value={route._id}>
+                        {route.code} - {route.name} ({route.startLocation} → {route.endLocation})
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -1126,7 +1013,7 @@ function RouteSectionsManager() {
                     value={formData.stopId}
                     onChange={(e) => setFormData({ ...formData, stopId: e.target.value })}
                     required
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
+                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white text-sm sm:text-base"
                   >
                     <option value="">Select a stop</option>
                     {filteredStops.map((stop) => (
@@ -1147,11 +1034,11 @@ function RouteSectionsManager() {
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     required
                     placeholder="e.g., Regular, Express, VIP"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm sm:text-base"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Fare (Rs.)
@@ -1164,7 +1051,7 @@ function RouteSectionsManager() {
                       min="0"
                       step="0.01"
                       placeholder="0.00"
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm sm:text-base"
                     />
                   </div>
                   
@@ -1179,7 +1066,7 @@ function RouteSectionsManager() {
                       required
                       min="0"
                       placeholder="1"
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm sm:text-base"
                     />
                   </div>
                 </div>
@@ -1187,7 +1074,7 @@ function RouteSectionsManager() {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
                   <select
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
+                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white text-sm sm:text-base"
                     value={formData.isActive ? 'true' : 'false'}
                     onChange={(e) => setFormData({...formData, isActive: e.target.value === 'true'})}
                   >
@@ -1199,26 +1086,28 @@ function RouteSectionsManager() {
             </div>
             
             {/* Footer */}
-            <div className="flex justify-end gap-3 p-6 pt-4 border-t border-gray-100 bg-gray-50 rounded-b-xl">
+            <div className="flex flex-col sm:flex-row justify-end gap-3 p-4 sm:p-6 pt-3 sm:pt-4 border-t border-gray-100 bg-gray-50 rounded-b-xl sticky bottom-0">
               <button
                 type="button"
                 onClick={() => {
                   setShowModal(false);
                   resetForm();
                 }}
-                className="px-6 py-2.5 border-2 border-gray-300 text-gray-700 hover:bg-gray-100 hover:border-gray-400 rounded-lg font-medium transition-all"
+                className="w-full sm:w-auto px-4 sm:px-6 py-2.5 border-2 border-gray-300 text-gray-700 hover:bg-gray-100 hover:border-gray-400 rounded-lg font-medium transition-all text-sm sm:text-base"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 form="routeSectionForm"
-                className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+                className="w-full sm:w-auto px-4 sm:px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2 text-sm sm:text-base"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
                 </svg>
-                {selectedRouteSection ? 'Update Route Section' : 'Create Route Section'}
+                <span className="truncate">
+                  {selectedRouteSection ? 'Update Section' : 'Create Section'}
+                </span>
               </button>
             </div>
           </div>
