@@ -4,12 +4,14 @@ import { useState, useEffect } from 'react';
 import { RouteSectionService, type RouteSection } from '@/services/routeSection.service';
 import { RouteService, type Route } from '@/services/route.service';
 import { StopService, type Stop } from '@/services/stop.service';
+import { Toast } from '@/components/ui/Toast';
 
 // RouteSectionsManager component
 function RouteSectionsManager() {
   const [routeSections, setRouteSections] = useState<RouteSection[]>([]);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [stops, setStops] = useState<Stop[]>([]);
+  const [filteredStops, setFilteredStops] = useState<Stop[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectedRouteSection, setSelectedRouteSection] = useState<RouteSection | null>(null);
@@ -17,6 +19,27 @@ function RouteSectionsManager() {
   const [filterRoute, setFilterRoute] = useState('');
   const [sortBy, setSortBy] = useState<'route' | 'order' | 'fare' | 'createdAt'>('order');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [generating, setGenerating] = useState(false);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [generateFormData, setGenerateFormData] = useState({
+    routeId: '',
+    category: 'normal',
+    fareMultiplier: 1.0,
+    overwriteExisting: false
+  });
+
+  // Toast state
+  const [toast, setToast] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
 
   // Form state
   const [formData, setFormData] = useState({
@@ -27,6 +50,16 @@ function RouteSectionsManager() {
     order: 0,
     isActive: true
   });
+
+  // Toast helper function
+  const showToast = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    setToast({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
 
   useEffect(() => {
     fetchInitialData();
@@ -101,13 +134,28 @@ function RouteSectionsManager() {
     }
   };
 
+  // Fetch stops by route for the modal
+  const fetchStopsByRoute = async (routeId: string) => {
+    try {
+      console.log('Fetching stops for route:', routeId);
+      const stopsData = await StopService.getStopsByRoute(routeId);
+      console.log('Fetched stops for route:', stopsData);
+      setFilteredStops(stopsData);
+    } catch (error) {
+      console.error('Error fetching stops by route:', error);
+      setFilteredStops([]);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       if (selectedRouteSection) {
         await RouteSectionService.updateRouteSection(selectedRouteSection._id, formData);
+        showToast('Success', 'Route section updated successfully!', 'success');
       } else {
         await RouteSectionService.createRouteSection(formData);
+        showToast('Success', 'Route section created successfully!', 'success');
       }
       
       // Refresh data based on current filter state
@@ -122,11 +170,11 @@ function RouteSectionsManager() {
       resetForm();
     } catch (error) {
       console.error('Error submitting form:', error);
-      alert('Error saving route section. Please try again.');
+      showToast('Error', 'Error saving route section. Please try again.', 'error');
     }
   };
 
-  const handleEdit = (routeSection: RouteSection) => {
+  const handleEdit = async (routeSection: RouteSection) => {
     setSelectedRouteSection(routeSection);
     setFormData({
       routeId: routeSection.routeId._id,
@@ -136,6 +184,10 @@ function RouteSectionsManager() {
       order: routeSection.order,
       isActive: routeSection.isActive
     });
+    
+    // Fetch stops for the selected route
+    await fetchStopsByRoute(routeSection.routeId._id);
+    
     setShowModal(true);
   };
 
@@ -143,6 +195,8 @@ function RouteSectionsManager() {
     if (window.confirm('Are you sure you want to delete this route section?')) {
       try {
         await RouteSectionService.deleteRouteSection(id);
+        
+        showToast('Success', 'Route section deleted successfully!', 'success');
         
         // Refresh data based on current filter state
         if (filterRoute === 'all') {
@@ -153,8 +207,87 @@ function RouteSectionsManager() {
         // If filterRoute is empty, don't fetch anything - user must select a route
       } catch (error) {
         console.error('Error deleting route section:', error);
-        alert('Error deleting route section. Please try again.');
+        showToast('Error', 'Error deleting route section. Please try again.', 'error');
       }
+    }
+  };
+
+  const handleGenerate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!generateFormData.routeId) {
+      showToast('Validation Error', 'Please select a route to generate sections for.', 'warning');
+      return;
+    }
+
+    try {
+      setGenerating(true);
+      console.log('Generating route sections for route:', generateFormData.routeId);
+      
+      // Use intelligent auto-generate with Section model pricing
+      const result = await RouteSectionService.autoGenerateRouteSections(
+        generateFormData.routeId, 
+        generateFormData.category, 
+        generateFormData.fareMultiplier,
+        generateFormData.overwriteExisting
+      );
+      
+      console.log('Intelligent generation result:', result);
+      
+      // Show detailed success message with workflow information
+      const message = result.data.workflow ? 
+        `🎯 Intelligent Route Sections Generated Successfully!\n\n` +
+        `📋 Workflow Completed:\n` +
+        `${result.data.workflow.step1}\n` +
+        `${result.data.workflow.step2}\n` +
+        `${result.data.workflow.step3}\n` +
+        `${result.data.workflow.step4}\n` +
+        `${result.data.workflow.step5}\n\n` +
+        `📊 Generation Results:\n` +
+        `✅ Created: ${result.data.stats.totalGenerated}\n` +
+        `⏭️ Skipped: ${result.data.stats.totalSkipped}\n` +
+        `❌ Errors: ${result.data.stats.totalErrors}\n\n` +
+        `🔗 Section Mapping:\n` +
+        `📍 Stops Processed: ${result.data.stats.stopsProcessed}\n` +
+        `🎯 Sections Matched: ${result.data.stats.sectionsMatched}\n` +
+        `� Unique Section Numbers: ${result.data.stats.uniqueSectionNumbers}\n\n` +
+        `${generateFormData.fareMultiplier !== 1.0 ? `💰 Fare Multiplier Applied: ${generateFormData.fareMultiplier}x\n` : ''}` +
+        `🔄 Processing Mode: ${generateFormData.overwriteExisting ? 'Overwrite Existing' : 'Skip Existing'}`
+        :
+        `Route sections generated successfully!\n` +
+        `Generated: ${result.data.stats?.totalGenerated || result.data.generated?.length || 0}\n` +
+        `Skipped: ${result.data.stats?.totalSkipped || result.data.skipped?.length || 0}\n` +
+        `Errors: ${result.data.stats?.totalErrors || result.data.errors?.length || 0}`;
+      
+      showToast(
+        'Generation Complete!', 
+        message, 
+        'success'
+      );
+      
+      setShowGenerateModal(false);
+      setGenerateFormData({ 
+        routeId: '', 
+        category: 'normal', 
+        fareMultiplier: 1.0, 
+        overwriteExisting: false 
+      });
+      
+      // Refresh data based on current filter state
+      if (filterRoute === 'all') {
+        await fetchAllRouteSections();
+      } else if (filterRoute && filterRoute !== '') {
+        await fetchRouteSections(filterRoute);
+      } else if (generateFormData.routeId) {
+        // If no filter is set, set it to the generated route and fetch its sections
+        setFilterRoute(generateFormData.routeId);
+        await fetchRouteSections(generateFormData.routeId);
+      }
+      
+    } catch (error) {
+      console.error('Error generating route sections:', error);
+      showToast('Generation Failed', 'Error generating route sections. Please try again.', 'error');
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -168,6 +301,7 @@ function RouteSectionsManager() {
       isActive: true
     });
     setSelectedRouteSection(null);
+    setFilteredStops([]); // Clear filtered stops when resetting form
   };
 
   const filteredAndSortedRouteSections = routeSections
@@ -246,14 +380,7 @@ function RouteSectionsManager() {
           {/* Content Area */}
           <div className="p-8">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
-              <div>
-                <h2 className="text-3xl font-bold text-gray-800 mb-2">
-                  Route Sections
-                </h2>
-                <p className="text-gray-600">
-                  View all route sections or filter by specific route
-                </p>
-              </div>
+
               
               <div className="flex items-center gap-4 w-full lg:w-auto">
                 <div className="relative flex-grow lg:w-80">
@@ -304,15 +431,20 @@ function RouteSectionsManager() {
                     <option value="all">All Routes</option>
                     {routes.map((route) => (
                       <option key={route._id} value={route._id}>
-                        {route.code} - {route.name} ({route.startLocation} → {route.endLocation})
+                        {route.routeNumber || route.code} - {route.routeName || route.name} ({(route.startPoint || route.startLocation)} → {(route.endPoint || route.endLocation)})
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     resetForm();
+                    // If a specific route is selected (not 'all' or ''), pre-populate the route
+                    if (filterRoute && filterRoute !== 'all' && filterRoute !== '') {
+                      setFormData(prev => ({...prev, routeId: filterRoute}));
+                      await fetchStopsByRoute(filterRoute);
+                    }
                     setShowModal(true);
                   }}
                   className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-3 whitespace-nowrap"
@@ -321,6 +453,24 @@ function RouteSectionsManager() {
                     <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
                   </svg>
                   Add Route Section
+                </button>
+
+                <button
+                  onClick={() => {
+                    setGenerateFormData({ 
+                      routeId: filterRoute && filterRoute !== 'all' ? filterRoute : '', 
+                      category: 'normal', 
+                      fareMultiplier: 1.0, 
+                      overwriteExisting: false 
+                    });
+                    setShowGenerateModal(true);
+                  }}
+                  className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-6 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-3 whitespace-nowrap"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                  </svg>
+                  Generate Sections
                 </button>
               </div>
             </div>
@@ -507,10 +657,11 @@ function RouteSectionsManager() {
                     }
                   </p>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       resetForm();
                       if (filterRoute && filterRoute !== 'all') {
                         setFormData(prev => ({...prev, routeId: filterRoute}));
+                        await fetchStopsByRoute(filterRoute);
                       }
                       setShowModal(true);
                     }}
@@ -560,10 +711,11 @@ function RouteSectionsManager() {
                   </p>
                   {(!searchTerm || (filterRoute && filterRoute !== 'all')) && (
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         resetForm();
                         if (filterRoute && filterRoute !== 'all') {
                           setFormData(prev => ({...prev, routeId: filterRoute}));
+                          await fetchStopsByRoute(filterRoute);
                         }
                         setShowModal(true);
                       }}
@@ -625,14 +777,24 @@ function RouteSectionsManager() {
                   </label>
                   <select
                     value={formData.routeId}
-                    onChange={(e) => setFormData({ ...formData, routeId: e.target.value })}
+                    onChange={async (e) => {
+                      const newRouteId = e.target.value;
+                      setFormData({ ...formData, routeId: newRouteId, stopId: '' }); // Clear stop selection when route changes
+                      
+                      // Fetch stops for the selected route
+                      if (newRouteId) {
+                        await fetchStopsByRoute(newRouteId);
+                      } else {
+                        setFilteredStops([]);
+                      }
+                    }}
                     required
                     className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
                   >
                     <option value="">Select a route</option>
                     {routes.map((route) => (
                    <option key={route._id} value={route._id}>
-                        {route.code} - {route.name} ({route.startLocation} → {route.endLocation})
+                        {route.routeNumber || route.code} - {route.routeName || route.name} ({(route.startPoint || route.startLocation)} → {(route.endPoint || route.endLocation)})
                       </option>
                     ))}
                   </select>
@@ -649,7 +811,7 @@ function RouteSectionsManager() {
                     className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
                   >
                     <option value="">Select a stop</option>
-                    {stops.map((stop) => (
+                    {filteredStops.map((stop) => (
                       <option key={stop._id} value={stop._id}>
                         {stop.stopName} - Section {stop.sectionNumber}
                       </option>
@@ -744,6 +906,202 @@ function RouteSectionsManager() {
           </div>
         </div>
             )}
+
+      {/* Generate Route Sections Modal */}
+      {showGenerateModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.3)' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowGenerateModal(false);
+              setGenerateFormData({ 
+                routeId: '', 
+                category: 'normal', 
+                fareMultiplier: 1.0, 
+                overwriteExisting: false 
+              });
+            }
+          }}
+        >
+          <div 
+            className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto transform transition-all duration-300 ease-out scale-100 my-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 pb-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">Auto Generate Route Sections</h2>
+                <p className="text-sm text-gray-500 mt-1">Automatically create sections based on stops</p>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowGenerateModal(false);
+                  setGenerateFormData({ 
+                    routeId: '', 
+                    category: 'normal', 
+                    fareMultiplier: 1.0, 
+                    overwriteExisting: false 
+                  });
+                }}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200 group"
+              >
+                <svg className="h-5 w-5 text-gray-400 group-hover:text-gray-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            {/* Form Content */}
+            <div className="p-6">
+              <form id="generateForm" onSubmit={handleGenerate} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Route *
+                  </label>
+                  <select
+                    value={generateFormData.routeId}
+                    onChange={(e) => setGenerateFormData({ ...generateFormData, routeId: e.target.value })}
+                    required
+                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white"
+                  >
+                    <option value="">Select a route</option>
+                    {routes.map((route) => (
+                      <option key={route._id} value={route._id}>
+                        {route.routeNumber || route.code} - {route.routeName || route.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Category
+                  </label>
+                  <select
+                    value={generateFormData.category}
+                    onChange={(e) => setGenerateFormData({ ...generateFormData, category: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white"
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="luxury">Luxury</option>
+                    <option value="semi_luxury">Semi Luxury</option>
+                    <option value="high_luxury">High Luxury</option>
+                    <option value="sisu_sariya">Sisu Sariya</option>
+                    <option value="express">Express</option>
+                  </select>
+                </div>
+
+                <div className="bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <span className="text-blue-600 text-lg">🎯</span>
+                    <h4 className="text-sm font-semibold text-blue-800">Intelligent Auto-Generation</h4>
+                  </div>
+                  <div className="text-xs text-blue-700 leading-relaxed space-y-2">
+                    <p className="font-medium">How it works:</p>
+                    <div className="pl-3 space-y-1">
+                      <p>• <strong>Step 1:</strong> Select route and category</p>
+                      <p>• <strong>Step 2:</strong> System fetches stops with section numbers</p>
+                      <p>• <strong>Step 3:</strong> Matches Section model pricing by category</p>
+                      <p>• <strong>Step 4:</strong> Automatically generates route sections</p>
+                    </div>
+                    <p className="mt-2 p-2 bg-white rounded border border-blue-200">
+                      <span className="font-medium text-blue-800">💡 No manual fare input required!</span><br/>
+                      Pricing comes directly from your Section model.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Advanced Options - Always Available */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Fare Multiplier
+                  </label>
+                  <input
+                    type="number"
+                    value={generateFormData.fareMultiplier}
+                        onChange={(e) => setGenerateFormData({ ...generateFormData, fareMultiplier: Number(e.target.value) })}
+                        min="0.1"
+                        max="10"
+                        step="0.1"
+                        placeholder="1.0"
+                        className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                      />
+                      <p className="text-xs text-gray-500 mt-2">
+                        Multiplier to adjust fares (1.0 = no change, 1.5 = 50% increase)
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={generateFormData.overwriteExisting}
+                          onChange={(e) => setGenerateFormData({ ...generateFormData, overwriteExisting: e.target.checked })}
+                          className="mr-3 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                        />
+                        <span className="text-sm font-semibold text-gray-700">Overwrite Existing</span>
+                      </label>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Update existing route sections instead of skipping them
+                      </p>
+                    </div>
+              </form>
+            </div>
+            
+            {/* Footer */}
+            <div className="flex justify-end gap-3 p-6 pt-4 border-t border-gray-100 bg-gray-50 rounded-b-xl">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowGenerateModal(false);
+                  setGenerateFormData({ 
+                    routeId: '', 
+                    category: 'normal', 
+                    fareMultiplier: 1.0, 
+                    overwriteExisting: false 
+                  });
+                }}
+                className="px-6 py-2.5 border-2 border-gray-300 text-gray-700 hover:bg-gray-100 hover:border-gray-400 rounded-lg font-medium transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="generateForm"
+                disabled={generating}
+                className="px-6 py-2.5 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+              >
+                {generating ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                    </svg>
+                    Generate Sections
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Toast Notification */}
+      {toast.isOpen && (
+        <Toast
+          isOpen={toast.isOpen}
+          onClose={() => setToast(prev => ({ ...prev, isOpen: false }))}
+          title={toast.title}
+          message={toast.message}
+          type={toast.type}
+          duration={5000}
+        />
+      )}
           </div>
         </div>
       </div>

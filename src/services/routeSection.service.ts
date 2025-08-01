@@ -165,6 +165,39 @@ export const RouteSectionService = {
       console.error('Error fetching route sections by owner:', error);
       throw error;
     }
+  },
+
+  // Auto-generate route sections for a route (Legacy method - kept for compatibility)
+  async generateRouteSections(routeId: string, category: string = 'normal', baseFare: number = 50): Promise<any> {
+    try {
+      const response = await api.post(`/route-sections/generate/${routeId}`, {
+        category,
+        baseFare
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error generating route sections:', error);
+      throw error;
+    }
+  },
+
+  // Intelligent auto-generate route sections using Section model pricing (RECOMMENDED)
+  async autoGenerateRouteSections(
+    routeId: string, 
+    category: string = 'normal', 
+    fareMultiplier: number = 1.0, 
+    overwriteExisting: boolean = false
+  ): Promise<any> {
+    try {
+      const response = await api.post(`/route-sections/auto-generate/${routeId}/${category}`, {
+        fareMultiplier,
+        overwriteExisting
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error auto-generating route sections:', error);
+      throw error;
+    }
   }
 };
 
