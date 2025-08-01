@@ -22,10 +22,48 @@ export interface Section {
 export const SectionService = {
   async getAllSections(): Promise<Section[]> {
     try {
-      const response = await api.get('/sections');
+      // Request all sections with a high limit to bypass pagination
+      const response = await api.get('/sections?limit=99999');
+      console.log(`Fetched ${response.data.data.length} sections from backend`);
       return response.data.data;
     } catch (error) {
       console.error('Error fetching sections:', error);
+      throw error;
+    }
+  },
+
+  async getSectionsWithPagination(page: number = 1, limit: number = 15): Promise<{sections: Section[], count: number, totalPages: number, currentPage: number, totalCount: number}> {
+    try {
+      const response = await api.get(`/sections?page=${page}&limit=${limit}`);
+      return {
+        sections: response.data.data,
+        count: response.data.count,
+        totalPages: response.data.totalPages,
+        currentPage: response.data.currentPage,
+        totalCount: response.data.totalCount || response.data.data.length
+      };
+    } catch (error) {
+      console.error('Error fetching sections with pagination:', error);
+      throw error;
+    }
+  },
+
+  async getAllSectionsCount(): Promise<{totalSections: number, sectionsByCategory: Record<string, number>}> {
+    try {
+      const response = await api.get('/sections?limit=99999');
+      const allSections = response.data.data;
+      
+      const sectionsByCategory = allSections.reduce((acc: Record<string, number>, section: Section) => {
+        acc[section.category] = (acc[section.category] || 0) + 1;
+        return acc;
+      }, {});
+      
+      return {
+        totalSections: allSections.length,
+        sectionsByCategory
+      };
+    } catch (error) {
+      console.error('Error fetching sections count:', error);
       throw error;
     }
   },

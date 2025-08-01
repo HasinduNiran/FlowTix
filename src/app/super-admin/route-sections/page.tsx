@@ -28,6 +28,14 @@ function RouteSectionsManager() {
     overwriteExisting: false
   });
 
+  // Pagination state
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 15, // Changed to 15 items per page as requested
+    total: 0,
+    totalPages: 0
+  });
+
   // Toast state
   const [toast, setToast] = useState<{
     isOpen: boolean;
@@ -77,23 +85,27 @@ function RouteSectionsManager() {
       
       console.log('Fetching initial data...');
       
-      // Only fetch routes and stops initially, not route sections
-      const [routesData, stopsData] = await Promise.all([
+      // Fetch routes, stops, and all route sections initially
+      const [routesData, stopsData, routeSectionsData] = await Promise.all([
         RouteService.getAllRoutes(),
-        StopService.getAllStops()
+        StopService.getAllStops(),
+        RouteSectionService.getAllRouteSections()
       ]);
 
       console.log('Fetched routes:', routesData);
       console.log('Fetched stops:', stopsData);
+      console.log('Fetched route sections:', routeSectionsData);
 
       setRoutes(routesData);
       setStops(stopsData);
-      setRouteSections([]); // Start with empty route sections - user must select a route
+      setRouteSections(routeSectionsData); // Load all route sections initially
+      setFilterRoute('all'); // Set default filter to show all routes
     } catch (error) {
       console.error('Error fetching initial data:', error);
       setRoutes([]);
       setStops([]);
       setRouteSections([]);
+      showToast('Error', 'Failed to load initial data. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
@@ -106,6 +118,7 @@ function RouteSectionsManager() {
       
       const routeSectionsData = await RouteSectionService.getAllRouteSections();
       console.log('All fetched route sections:', routeSectionsData);
+      console.log('Total route sections count:', routeSectionsData.length);
       
       setRouteSections(routeSectionsData);
     } catch (error) {
@@ -123,6 +136,7 @@ function RouteSectionsManager() {
       
       const routeSectionsData = await RouteSectionService.getAllRouteSections();
       console.log('All fetched route sections:', routeSectionsData);
+      console.log('Total route sections count:', routeSectionsData.length);
       
       // Always set all route sections - filtering will be handled by the filter logic
       setRouteSections(routeSectionsData);
@@ -350,6 +364,40 @@ function RouteSectionsManager() {
       }
     });
 
+  // Update pagination totals
+  const totalFiltered = filteredAndSortedRouteSections.length;
+  const effectiveLimit = pagination.limit === 9999 ? totalFiltered : pagination.limit;
+  const totalPages = pagination.limit === 9999 ? 1 : Math.ceil(totalFiltered / pagination.limit);
+  const startIndex = pagination.limit === 9999 ? 0 : (pagination.page - 1) * pagination.limit;
+  const endIndex = pagination.limit === 9999 ? totalFiltered : startIndex + pagination.limit;
+  const paginatedRouteSections = filteredAndSortedRouteSections.slice(startIndex, endIndex);
+
+  // Update pagination state when filter changes
+  useEffect(() => {
+    const correctedTotalPages = pagination.limit === 9999 ? 1 : Math.ceil(totalFiltered / pagination.limit);
+    setPagination(prev => ({
+      ...prev,
+      total: totalFiltered,
+      totalPages: correctedTotalPages,
+      page: Math.min(prev.page, Math.max(1, correctedTotalPages)) // Reset to page 1 if current page exceeds total pages
+    }));
+  }, [totalFiltered, pagination.limit]);
+
+  const handlePageChange = (newPage: number) => {
+    setPagination(prev => ({
+      ...prev,
+      page: newPage
+    }));
+  };
+
+  const handleLimitChange = (newLimit: number) => {
+    setPagination(prev => ({
+      ...prev,
+      limit: newLimit,
+      page: 1 // Reset to first page when changing limit
+    }));
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -486,7 +534,7 @@ function RouteSectionsManager() {
                       </svg>
                     </div>
                     <p className="text-blue-800 font-medium text-lg">
-                      Showing {filteredAndSortedRouteSections.length} route {filteredAndSortedRouteSections.length === 1 ? 'section' : 'sections'}
+                      Showing {pagination.limit === 9999 ? 'all' : Math.min(pagination.limit, totalFiltered)} of {totalFiltered} route {totalFiltered === 1 ? 'section' : 'sections'}
                       {filterRoute === 'all' ? (
                         <span className="text-blue-600 ml-1">
                           from all routes
@@ -496,6 +544,11 @@ function RouteSectionsManager() {
                           for selected route
                         </span>
                       ) : null}
+                      {pagination.limit !== 9999 && (
+                        <span className="text-blue-600 ml-1">
+                          (Page {pagination.page} of {pagination.totalPages})
+                        </span>
+                      )}
                     </p>
                   </div>
                   <div className="flex items-center gap-4">
@@ -529,7 +582,7 @@ function RouteSectionsManager() {
             )}
 
             {/* Route Sections Table */}
-            {filteredAndSortedRouteSections.length > 0 && (
+            {paginatedRouteSections.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -561,7 +614,7 @@ function RouteSectionsManager() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredAndSortedRouteSections.map((routeSection) => (
+                      {paginatedRouteSections.map((routeSection) => (
                         <tr key={routeSection._id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
@@ -641,7 +694,144 @@ function RouteSectionsManager() {
               </div>
             )}
 
-            {routeSections.length === 0 && !loading && filterRoute !== '' && (
+            {/* Pagination Controls */}
+            {paginatedRouteSections.length > 0 && pagination.totalPages > 1 && pagination.limit !== 9999 && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mt-6">
+                <div className="flex items-center justify-between">
+                  {/* Results info */}
+                  <div className="flex items-center gap-4">
+                    <p className="text-sm text-gray-700">
+                      Showing {startIndex + 1} to {Math.min(endIndex, totalFiltered)} of {totalFiltered} results
+                    </p>
+                    
+                    {/* Items per page selector */}
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-gray-700">Show:</label>
+                      <select
+                        value={pagination.limit}
+                        onChange={(e) => handleLimitChange(Number(e.target.value))}
+                        className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value={5}>5</option>
+                        <option value={10}>10</option>
+                        <option value={15}>15</option>
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                        <option value={9999}>All</option>
+                      </select>
+                      <span className="text-sm text-gray-700">per page</span>
+                    </div>
+                  </div>
+
+                  {/* Pagination buttons */}
+                  <div className="flex items-center space-x-2">
+                    {/* Previous button */}
+                    <button
+                      onClick={() => handlePageChange(pagination.page - 1)}
+                      disabled={pagination.page === 1}
+                      className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+
+                    {/* Page numbers */}
+                    <div className="flex items-center space-x-1">
+                      {/* First page */}
+                      {pagination.page > 3 && (
+                        <>
+                          <button
+                            onClick={() => handlePageChange(1)}
+                            className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                          >
+                            1
+                          </button>
+                          {pagination.page > 4 && (
+                            <span className="px-2 py-2 text-sm text-gray-500">...</span>
+                          )}
+                        </>
+                      )}
+
+                      {/* Current page and surrounding pages */}
+                      {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                        const page = Math.max(1, Math.min(pagination.totalPages - 4, pagination.page - 2)) + i;
+                        if (page > pagination.totalPages) return null;
+                        
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => handlePageChange(page)}
+                            className={`px-3 py-2 text-sm font-medium rounded-md ${
+                              page === pagination.page
+                                ? 'bg-blue-600 text-white border border-blue-600'
+                                : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      })}
+
+                      {/* Last page */}
+                      {pagination.page < pagination.totalPages - 2 && (
+                        <>
+                          {pagination.page < pagination.totalPages - 3 && (
+                            <span className="px-2 py-2 text-sm text-gray-500">...</span>
+                          )}
+                          <button
+                            onClick={() => handlePageChange(pagination.totalPages)}
+                            className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                          >
+                            {pagination.totalPages}
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Next button */}
+                    <button
+                      onClick={() => handlePageChange(pagination.page + 1)}
+                      disabled={pagination.page === pagination.totalPages}
+                      className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Items per page selector for "All" view */}
+            {paginatedRouteSections.length > 0 && pagination.limit === 9999 && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mt-6">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-700">
+                    Showing all {totalFiltered} results
+                  </p>
+                  
+                  {/* Items per page selector */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-700">Show:</label>
+                    <select
+                      value={pagination.limit}
+                      onChange={(e) => handleLimitChange(Number(e.target.value))}
+                      className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={15}>15</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value={9999}>All</option>
+                    </select>
+                    <span className="text-sm text-gray-700">per page</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {totalFiltered === 0 && !loading && filterRoute !== '' && (
               <div className="text-center py-12 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300">
                 <div className="max-w-md mx-auto">
                   <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -693,7 +883,7 @@ function RouteSectionsManager() {
               </div>
             )}
 
-            {routeSections.length > 0 && filteredAndSortedRouteSections.length === 0 && !loading && (
+            {routeSections.length > 0 && totalFiltered === 0 && !loading && (
               <div className="text-center py-12 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300">
                 <div className="max-w-md mx-auto">
                   <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -1107,7 +1297,9 @@ function RouteSectionsManager() {
       </div>
     </div>
   );
-}export default function RouteSectionsPage() {
+}
+
+export default function RouteSectionsPage() {
   return (
     <RouteSectionsManager />
   );

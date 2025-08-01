@@ -39,10 +39,26 @@ export interface CreateRouteSectionData {
 export interface UpdateRouteSectionData extends Partial<CreateRouteSectionData> {}
 
 export const RouteSectionService = {
-  // Get all route sections
+  // Get all route sections (bypasses pagination)
   async getAllRouteSections(): Promise<RouteSection[]> {
     try {
-      const response = await api.get('/route-sections');
+      // Request a very high limit to get all records, or try different approaches
+      let response;
+      
+      try {
+        // First try with a very high limit
+        response = await api.get('/route-sections', {
+          params: {
+            limit: 99999, // Request a very high number to get all records
+            page: 1
+          }
+        });
+      } catch (error) {
+        // If that fails, try without pagination parameters (some APIs might support this)
+        console.warn('High limit failed, trying without pagination:', error);
+        response = await api.get('/route-sections');
+      }
+      
       // Backend returns paginated data in response.data.data
       return response.data.data || [];
     } catch (error) {
@@ -54,6 +70,7 @@ export const RouteSectionService = {
   // Get route sections by route ID
   async getRouteSectionsByRoute(routeId: string): Promise<RouteSection[]> {
     try {
+      // Use the specific route endpoint which doesn't have pagination
       const response = await api.get(`/route-sections/route/${routeId}`);
       return response.data.data || [];
     } catch (error) {
@@ -150,6 +167,7 @@ export const RouteSectionService = {
       const allRouteSections = await Promise.all(
         routeIds.map(async (routeId) => {
           try {
+            // Use the specific route endpoint which doesn't have pagination
             const response = await api.get(`/route-sections/route/${routeId}`);
             return response.data.data || [];
           } catch (error) {
