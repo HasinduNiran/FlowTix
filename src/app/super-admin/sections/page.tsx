@@ -35,10 +35,19 @@ export default function SectionsPage() {
 
   // Fetch sections when page changes
   useEffect(() => {
-    if (currentPage > 1) {
+    if (currentPage >= 1) {
       fetchSections(currentPage);
     }
   }, [currentPage]);
+
+  // Reset to page 1 when category changes
+  useEffect(() => {
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+    } else {
+      fetchSections(1);
+    }
+  }, [selectedCategory]);
 
   const fetchSections = async (page: number = 1) => {
     setLoading(true);

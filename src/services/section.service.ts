@@ -50,21 +50,31 @@ export const SectionService = {
 
   async getAllSectionsCount(): Promise<{totalSections: number, sectionsByCategory: Record<string, number>}> {
     try {
-      const response = await api.get('/sections?limit=99999');
-      const allSections = response.data.data;
-      
-      const sectionsByCategory = allSections.reduce((acc: Record<string, number>, section: Section) => {
-        acc[section.category] = (acc[section.category] || 0) + 1;
-        return acc;
-      }, {});
-      
+      const response = await api.get('/sections/counts');
       return {
-        totalSections: allSections.length,
-        sectionsByCategory
+        totalSections: response.data.data.totalCount,
+        sectionsByCategory: response.data.data.countsByCategory
       };
     } catch (error) {
       console.error('Error fetching sections count:', error);
-      throw error;
+      // Fallback to the old method if the new endpoint is not available
+      try {
+        const fallbackResponse = await api.get('/sections?limit=99999');
+        const allSections = fallbackResponse.data.data;
+        
+        const sectionsByCategory = allSections.reduce((acc: Record<string, number>, section: Section) => {
+          acc[section.category] = (acc[section.category] || 0) + 1;
+          return acc;
+        }, {});
+        
+        return {
+          totalSections: allSections.length,
+          sectionsByCategory
+        };
+      } catch (fallbackError) {
+        console.error('Error with fallback sections count:', fallbackError);
+        throw error;
+      }
     }
   },
 
