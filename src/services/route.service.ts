@@ -45,7 +45,7 @@ export const RouteService = {
   // Routes
   async getAllRoutes(): Promise<Route[]> {
     try {
-      const response = await api.get('/routes');
+      const response = await api.get('/routes?limit=99999');
       // Map backend field names to frontend field names
       return response.data.data.map((route: any) => ({
         _id: route._id,
@@ -63,6 +63,61 @@ export const RouteService = {
     } catch (error) {
       console.error('Error fetching routes:', error);
       throw error;
+    }
+  },
+
+  async getRoutesWithPagination(page: number = 1, limit: number = 15, search: string = ''): Promise<{routes: Route[], count: number, totalPages: number, currentPage: number, totalCount: number, hasResults: boolean}> {
+    try {
+      let url = `/routes?page=${page}&limit=${limit}`;
+      if (search) {
+        url += `&search=${encodeURIComponent(search)}`;
+      }
+      
+      const response = await api.get(url);
+      return {
+        routes: response.data.data.map((route: any) => ({
+          _id: route._id,
+          name: route.routeName,
+          code: route.routeNumber,
+          startLocation: route.startPoint,
+          endLocation: route.endPoint,
+          distance: route.distance,
+          estimatedDuration: route.estimatedDuration,
+          isActive: route.isActive,
+          description: route.description,
+          createdAt: route.createdAt,
+          updatedAt: route.updatedAt
+        })),
+        count: response.data.count,
+        totalPages: response.data.totalPages,
+        currentPage: response.data.currentPage,
+        totalCount: response.data.totalCount || response.data.count,
+        hasResults: response.data.hasResults !== false
+      };
+    } catch (error) {
+      console.error('Error fetching routes with pagination:', error);
+      throw error;
+    }
+  },
+
+  async getAllRoutesCount(): Promise<{totalRoutes: number}> {
+    try {
+      const response = await api.get('/routes/counts');
+      return {
+        totalRoutes: response.data.data.totalCount
+      };
+    } catch (error) {
+      console.error('Error fetching routes count:', error);
+      // Fallback to the old method if the new endpoint is not available
+      try {
+        const fallbackResponse = await api.get('/routes?limit=99999');
+        return {
+          totalRoutes: fallbackResponse.data.data.length
+        };
+      } catch (fallbackError) {
+        console.error('Error with fallback routes count:', fallbackError);
+        throw error;
+      }
     }
   },
   

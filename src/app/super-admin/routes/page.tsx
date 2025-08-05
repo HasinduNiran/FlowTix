@@ -14,6 +14,12 @@ export default function RoutesPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalRoutes, setTotalRoutes] = useState<number>(0);
+
   const [newRoute, setNewRoute] = useState({
     name: '',
     code: '',
@@ -24,22 +30,88 @@ export default function RoutesPage() {
     description: ''
   });
 
-  // Fetch routes on component mount
+  // Fetch routes with pagination on component mount and when page changes
   useEffect(() => {
-    fetchRoutes();
+    if (currentPage >= 1) {
+      fetchRoutesWithPagination();
+    }
+  }, [currentPage]);
+
+  // Handle search term changes - reset to page 1 when searching
+  useEffect(() => {
+    if (searchTerm !== '') {
+      setCurrentPage(1);
+      fetchRoutesWithSearch();
+    } else if (searchTerm === '') {
+      setCurrentPage(1);
+      fetchRoutesWithPagination();
+    }
+  }, [searchTerm]);
+
+  // Update the useEffect for currentPage to handle both search and normal pagination
+  useEffect(() => {
+    if (currentPage >= 1) {
+      if (searchTerm) {
+        fetchRoutesWithSearch();
+      } else {
+        fetchRoutesWithPagination();
+      }
+    }
+  }, [currentPage]);
+
+  // Fetch total counts on component mount
+  useEffect(() => {
+    fetchTotalCounts();
   }, []);
 
-  const fetchRoutes = async () => {
+  const fetchRoutesWithPagination = async () => {
     setLoading(true);
     try {
-      const data = await RouteService.getAllRoutes();
-      setRoutes(data);
+      console.log(`Fetching routes for page ${currentPage}`);
+      const result = await RouteService.getRoutesWithPagination(currentPage, 15);
+      setRoutes(result.routes);
+      setTotalPages(result.totalPages);
+      setTotalRoutes(result.totalCount || result.routes.length);
       setError(null);
+      console.log(`Fetched ${result.routes.length} routes, total pages: ${result.totalPages}`);
     } catch (err) {
-      console.error('Failed to fetch routes:', err);
+      console.error('Failed to fetch routes with pagination:', err);
       setError('Failed to load routes. Please try again later.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRoutesWithSearch = async () => {
+    setLoading(true);
+    try {
+      console.log(`Searching routes for "${searchTerm}" on page ${currentPage}`);
+      const result = await RouteService.getRoutesWithPagination(currentPage, 15, searchTerm);
+      setRoutes(result.routes);
+      setTotalPages(result.totalPages);
+      setTotalRoutes(result.totalCount || result.routes.length);
+      setError(null);
+      
+      if (!result.hasResults && searchTerm) {
+        console.log(`No routes found for search term: "${searchTerm}"`);
+      } else {
+        console.log(`Found ${result.routes.length} routes for search term: "${searchTerm}", total pages: ${result.totalPages}`);
+      }
+    } catch (err) {
+      console.error('Failed to search routes:', err);
+      setError('Failed to search routes. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTotalCounts = async () => {
+    try {
+      const result = await RouteService.getAllRoutesCount();
+      setTotalRoutes(result.totalRoutes);
+      console.log(`Total routes in database: ${result.totalRoutes}`);
+    } catch (err) {
+      console.error('Failed to fetch total counts:', err);
     }
   };
 
@@ -65,7 +137,9 @@ export default function RoutesPage() {
         estimatedDuration: 0,
         description: ''
       });
-      fetchRoutes();
+      // Refresh data
+      fetchRoutesWithPagination();
+      fetchTotalCounts();
     } catch (err) {
       console.error('Failed to add route:', err);
       setError('Failed to add route. Please try again.');
@@ -76,7 +150,9 @@ export default function RoutesPage() {
     if (window.confirm('Are you sure you want to delete this route?')) {
       try {
         await RouteService.deleteRoute(id);
-        fetchRoutes();
+        // Refresh data
+        fetchRoutesWithPagination();
+        fetchTotalCounts();
       } catch (err) {
         console.error('Failed to delete route:', err);
         setError('Failed to delete route. Please try again.');
@@ -88,27 +164,49 @@ export default function RoutesPage() {
     router.push(`/super-admin/routes/${id}`);
   };
 
-  const filteredRoutes = routes.filter(route => 
-    route.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    route.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    route.startLocation.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    route.endLocation.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Handle page navigation
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    // The useEffect will trigger the appropriate fetch function
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  // Display routes directly from server (no client-side filtering needed)
+  const displayRoutes = routes;
 
   const columns = [
-    { header: 'Name', accessor: 'name' },
-    { header: 'Code', accessor: 'code' },
-    { header: 'Start Location', accessor: 'startLocation' },
-    { header: 'End Location', accessor: 'endLocation' },
-    { header: 'Distance (km)', accessor: 'distance' },
-    { header: 'Duration (min)', accessor: 'estimatedDuration' },
+    { header: 'Name', accessor: 'name' as keyof Route },
+    { header: 'Code', accessor: 'code' as keyof Route },
+    { header: 'Start Location', accessor: 'startLocation' as keyof Route },
+    { header: 'End Location', accessor: 'endLocation' as keyof Route },
+    { 
+      header: 'Distance (km)', 
+      accessor: 'distance' as keyof Route,
+      cell: (value: any) => value ? `${value} km` : 'N/A'
+    },
+    { 
+      header: 'Duration (min)', 
+      accessor: 'estimatedDuration' as keyof Route,
+      cell: (value: any) => value ? `${value} min` : 'N/A'
+    },
     {
       header: 'Actions',
-      accessor: '_id',
-      cell: (id: string) => (
+      accessor: '_id' as keyof Route,
+      cell: (value: any, route?: Route) => (
         <div className="flex space-x-2">
           <button
-            onClick={() => handleViewDetails(id)}
+            onClick={() => handleViewDetails(route?._id || value)}
             className="p-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors"
             title="View Details"
           >
@@ -118,7 +216,7 @@ export default function RoutesPage() {
             </svg>
           </button>
           <button
-            onClick={() => handleDeleteRoute(id)}
+            onClick={() => handleDeleteRoute(route?._id || value)}
             className="p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors"
             title="Delete Route"
           >
@@ -127,7 +225,7 @@ export default function RoutesPage() {
             </svg>
           </button>
           <button
-            onClick={() => handleViewDetails(id)}
+            onClick={() => handleViewDetails(route?._id || value)}
             className="p-2 bg-green-50 text-green-600 rounded-full hover:bg-green-100 transition-colors"
             title="Edit Route"
           >
@@ -138,7 +236,7 @@ export default function RoutesPage() {
         </div>
       )
     }
-  ];
+  ] as any[];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
@@ -229,7 +327,7 @@ export default function RoutesPage() {
                       </svg>
                     </div>
                     <p className="text-blue-800 font-medium text-lg">
-                      Showing {filteredRoutes.length} {filteredRoutes.length === 1 ? 'route' : 'routes'}
+                      Showing {(currentPage - 1) * 15 + 1} to {Math.min(currentPage * 15, totalRoutes)} of {totalRoutes} total routes
                     </p>
                   </div>
                 </div>
@@ -237,10 +335,77 @@ export default function RoutesPage() {
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                   <DataTable
                     columns={columns}
-                    data={filteredRoutes}
-                    emptyMessage="No routes found. Create one to get started."
+                    data={displayRoutes}
+                    emptyMessage={searchTerm ? `No routes found matching "${searchTerm}". Try a different search term.` : "No routes found. Create one to get started."}
                   />
                 </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="mt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div className="text-sm text-gray-600">
+                      Page {currentPage} of {totalPages}
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      {/* Previous Button */}
+                      <button
+                        onClick={handlePreviousPage}
+                        disabled={currentPage === 1}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                          currentPage === 1
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 shadow-sm'
+                        }`}
+                      >
+                        Previous
+                      </button>
+                      
+                      {/* Page Numbers */}
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                          let pageNum;
+                          if (totalPages <= 5) {
+                            pageNum = i + 1;
+                          } else if (currentPage <= 3) {
+                            pageNum = i + 1;
+                          } else if (currentPage >= totalPages - 2) {
+                            pageNum = totalPages - 4 + i;
+                          } else {
+                            pageNum = currentPage - 2 + i;
+                          }
+                          
+                          return (
+                            <button
+                              key={pageNum}
+                              onClick={() => handlePageChange(pageNum)}
+                              className={`px-3 py-2 rounded-lg font-medium transition-all ${
+                                pageNum === currentPage
+                                  ? 'bg-blue-600 text-white shadow-lg'
+                                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 shadow-sm'
+                              }`}
+                            >
+                              {pageNum}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      
+                      {/* Next Button */}
+                      <button
+                        onClick={handleNextPage}
+                        disabled={currentPage === totalPages}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                          currentPage === totalPages
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 shadow-sm'
+                        }`}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -391,4 +556,4 @@ export default function RoutesPage() {
       )}
     </div>
   );
-} 
+}
