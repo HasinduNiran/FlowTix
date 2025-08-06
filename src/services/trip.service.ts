@@ -27,6 +27,14 @@ export interface Trip {
   updatedAt: string;
 }
 
+export interface TripPaginationResponse {
+  trips: Trip[];
+  totalPages: number;
+  currentPage: number;
+  totalCount: number;
+  hasResults: boolean;
+}
+
 export const TripService = {
   async getAllTrips(filters?: { busId?: string; routeId?: string; date?: string; page?: number; limit?: number; sort?: string }): Promise<Trip[]> {
     try {
@@ -48,6 +56,49 @@ export const TripService = {
       return response.data.data || [];
     } catch (error) {
       console.error('Error fetching trips:', error);
+      throw error;
+    }
+  },
+
+  async getTripsWithPagination(
+    page: number = 1, 
+    limit: number = 15, 
+    filters?: { busId?: string; routeId?: string; date?: string; direction?: string; search?: string }
+  ): Promise<TripPaginationResponse> {
+    try {
+      let requestPage = page;
+      
+      // If we have a search term, always start from page 1
+      // This ensures search results are shown from the beginning
+      if (filters?.search && filters.search.trim()) {
+        requestPage = 1;
+      }
+      
+      const params: any = {
+        page: requestPage.toString(),
+        limit: limit.toString(),
+      };
+      
+      if (filters?.date) {
+        params.startDate = filters.date;
+        params.endDate = filters.date;
+      }
+      if (filters?.busId) params.busId = filters.busId;
+      if (filters?.routeId) params.routeId = filters.routeId;
+      if (filters?.direction) params.direction = filters.direction;
+      if (filters?.search && filters.search.trim()) params.search = filters.search.trim();
+
+      const response = await api.get('/trips', { params });
+      
+      return {
+        trips: response.data.data || [],
+        totalPages: response.data.totalPages || 1,
+        currentPage: response.data.page || 1,
+        totalCount: response.data.total || 0,
+        hasResults: response.data.hasResults !== false
+      };
+    } catch (error) {
+      console.error('Error fetching trips with pagination:', error);
       throw error;
     }
   },

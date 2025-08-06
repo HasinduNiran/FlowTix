@@ -19,6 +19,13 @@ export default function TripsPage() {
   const [dateFilter, setDateFilter] = useState<string>(new Date().toISOString().split('T')[0]);
   const [routes, setRoutes] = useState<any[]>([]);
   const [buses, setBuses] = useState<any[]>([]);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [hasResults, setHasResults] = useState<boolean>(true);
+  const itemsPerPage = 15;
 
   // Fetch initial data on component mount
   useEffect(() => {
@@ -27,20 +34,60 @@ export default function TripsPage() {
     fetchBuses();
   }, []);
 
-  // Fetch trips when date filter changes
+  // Fetch trips when filters change
   useEffect(() => {
+    setCurrentPage(1); // Reset to first page when filters change
     fetchTrips();
-  }, [dateFilter]);
+  }, [dateFilter, directionFilter]);
+
+  // Separate effect for search to handle debouncing and immediate reset to page 1
+  useEffect(() => {
+    if (searchTerm !== '') {
+      setCurrentPage(1); // Always reset to page 1 when searching
+    }
+    // Debounce search
+    const timeoutId = setTimeout(() => {
+      fetchTrips();
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
+  // Fetch trips when page changes
+  useEffect(() => {
+    if (trips.length > 0 || currentPage === 1) { // Only fetch if we have data or it's the first page
+      fetchTrips();
+    }
+  }, [currentPage]);
 
   const fetchTrips = async () => {
-    setLoading(true);
     try {
-      const data = await TripService.getAllTrips({ date: dateFilter });
-      setTrips(data);
+      setLoading(true);
       setError(null);
+      
+      const filters = {
+        date: dateFilter,
+        direction: directionFilter !== 'all' ? directionFilter : undefined,
+        search: searchTerm || undefined
+      };
+      
+      const response = await TripService.getTripsWithPagination(
+        currentPage,
+        itemsPerPage,
+        filters
+      );
+      
+      setTrips(response.trips || []);
+      setTotalPages(response.totalPages || 1);
+      setTotalCount(response.totalCount || 0);
+      setHasResults(response.hasResults !== false);
     } catch (err) {
       console.error('Failed to fetch trips:', err);
       setError('Failed to load trips. Please try again later.');
+      setTrips([]);
+      setTotalPages(1);
+      setTotalCount(0);
+      setHasResults(false);
     } finally {
       setLoading(false);
     }
@@ -110,23 +157,14 @@ export default function TripsPage() {
     }
   };
 
-  // Filter trips based on all filters
-  const filteredTrips = trips.filter(trip => {
-    const searchLower = searchTerm.toLowerCase();
-    const routeName = getRouteName(trip.routeId).toLowerCase();
-    const busNumber = getBusNumber(trip.busId).toLowerCase();
-    
-    const matchesSearch = 
-      trip.tripNumber.toString().includes(searchLower) ||
-      routeName.includes(searchLower) ||
-      busNumber.includes(searchLower) ||
-      trip.fromStopSection?.sectionName?.toLowerCase().includes(searchLower) ||
-      trip.toStopSection?.sectionName?.toLowerCase().includes(searchLower);
-    
-    const matchesDirection = directionFilter === 'all' || trip.direction === directionFilter;
-    
-    return matchesSearch && matchesDirection;
-  });
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleSearch = (value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(1); // Reset to first page on search
+  };
 
   // Table columns configuration
   const columns = [
@@ -276,7 +314,7 @@ export default function TripsPage() {
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2 bg-blue-50 px-4 py-2 rounded-full">
                   <span className="text-blue-600 font-semibold">Total:</span>
-                  <span className="text-blue-800 font-bold">{filteredTrips.length}</span>
+                  <span className="text-blue-800 font-bold">{totalCount}</span>
                 </div>
                 <Button 
                   onClick={fetchTrips}
@@ -343,6 +381,7 @@ export default function TripsPage() {
                   onClick={() => {
                     setSearchTerm('');
                     setDirectionFilter('all');
+                    setCurrentPage(1);
                   }}
                   variant="outline"
                   className="w-full flex items-center justify-center space-x-2"
@@ -375,12 +414,79 @@ export default function TripsPage() {
                 </div>
               </div>
             ) : (
-              <DataTable
-                columns={columns}
-                data={filteredTrips}
-                emptyMessage="No trips found matching your criteria"
-                keyExtractor={(trip) => trip._id}
-              />
+              <>
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <div className="text-gray-600 text-sm">
+                      Showing {trips?.length || 0} of {totalCount} trips (Page {currentPage} of {totalPages})
+                      {searchTerm && <span> • Filtered by: "{searchTerm}"</span>}
+                    </div>
+                    {!hasResults && searchTerm && <span className="text-red-600 font-medium"> • No results found</span>}
+                  </div>
+                  
+                  <DataTable
+                    columns={columns}
+                    data={trips}
+                    emptyMessage="No trips found matching your criteria"
+                    keyExtractor={(trip) => trip._id}
+                  />
+                </div>
+
+                {/* Pagination Controls */}
+                {hasResults && totalPages > 1 && (
+                  <div className="bg-white rounded-lg shadow-md mt-6 p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-gray-600">
+                        Showing page {currentPage} of {totalPages} ({totalCount} total trips)
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handlePageChange(currentPage - 1)}
+                          disabled={currentPage <= 1}
+                          className="px-3 py-1 text-sm border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 flex items-center space-x-1"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                          </svg>
+                          <span>Previous</span>
+                        </button>
+                        
+                        {/* Page Numbers */}
+                        <div className="flex items-center space-x-1">
+                          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                            const page = i + 1;
+                            return (
+                              <button
+                                key={page}
+                                onClick={() => handlePageChange(page)}
+                                className={`px-3 py-1 text-sm rounded-md ${
+                                  page === currentPage
+                                    ? 'bg-blue-600 text-white'
+                                    : 'border border-gray-300 hover:bg-gray-50'
+                                }`}
+                              >
+                                {page}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        
+                        <button
+                          onClick={() => handlePageChange(currentPage + 1)}
+                          disabled={currentPage >= totalPages}
+                          className="px-3 py-1 text-sm border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 flex items-center space-x-1"
+                        >
+                          <span>Next</span>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 

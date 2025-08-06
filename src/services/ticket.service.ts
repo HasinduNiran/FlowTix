@@ -34,6 +34,16 @@ export interface Ticket {
   updatedAt: string;
 }
 
+export interface TicketPaginationResponse {
+  tickets: Ticket[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasResults?: boolean;
+  searchTerm?: string;
+}
+
 export const TicketService = {
   async getAllTickets(filters?: { routeId?: string; busId?: string; conductorId?: string }): Promise<Ticket[]> {
     try {
@@ -41,6 +51,54 @@ export const TicketService = {
       return response.data.data || [];
     } catch (error) {
       console.error('Error fetching tickets:', error);
+      throw error;
+    }
+  },
+
+  async getTicketsWithPagination(
+    page: number = 1, 
+    limit: number = 15, 
+    search: string = '',
+    filters?: { 
+      routeId?: string; 
+      busId?: string; 
+      conductorId?: string; 
+      startDate?: string; 
+      endDate?: string;
+      paymentMethod?: string;
+      tripNumber?: number;
+    }
+  ): Promise<TicketPaginationResponse> {
+    try {
+      // Always reset to page 1 when search changes
+      if (search && page > 1) {
+        page = 1;
+      }
+
+      const params: any = {
+        page,
+        limit,
+        ...(filters || {})
+      };
+
+      if (search && search.trim()) {
+        params.search = search.trim();
+      }
+
+      console.log('Fetching tickets with params:', params);
+      const response = await api.get('/tickets', { params });
+      
+      return {
+        tickets: response.data.data || [],
+        total: response.data.total || 0,
+        page: response.data.page || page,
+        limit: response.data.limit || limit,
+        totalPages: response.data.totalPages || 0,
+        hasResults: response.data.hasResults,
+        searchTerm: response.data.searchTerm
+      };
+    } catch (error) {
+      console.error('Error fetching tickets with pagination:', error);
       throw error;
     }
   },

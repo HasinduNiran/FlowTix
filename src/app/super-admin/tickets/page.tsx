@@ -22,6 +22,13 @@ export default function TicketsPage() {
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');
   const [fromStopFilter, setFromStopFilter] = useState<string>('all');
   const [toStopFilter, setToStopFilter] = useState<string>('all');
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalTickets, setTotalTickets] = useState<number>(0);
+  const itemsPerPage = 15;
+  
   const [selectedBus, setSelectedBus] = useState<string>('');
   const [busSearchTerm, setBusSearchTerm] = useState<string>('');
   const [showBusSuggestions, setShowBusSuggestions] = useState<boolean>(false);
@@ -39,20 +46,62 @@ export default function TicketsPage() {
   useEffect(() => {
     fetchRoutes();
     fetchBuses();
+    fetchTicketsWithPagination(); // Load tickets on page load
   }, []);
 
-  // Fetch tickets when bus, date, or trip number is selected
+  // Fetch tickets with pagination when page changes
+  useEffect(() => {
+    if (currentPage >= 1) {
+      if (searchTerm) {
+        fetchTicketsWithSearch();
+      } else {
+        fetchTicketsWithPagination();
+      }
+    }
+  }, [currentPage]);
+
+  // Handle search term changes - reset to page 1 when searching
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      if (searchTerm !== '') {
+        setCurrentPage(1);
+        fetchTicketsWithSearch();
+      } else if (searchTerm === '') {
+        setCurrentPage(1);
+        fetchTicketsWithPagination();
+      }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(debounceTimer);
+  }, [searchTerm]);
+
+  // Handle filter changes - reset to page 1 and refetch
+  useEffect(() => {
+    if (selectedBus || paymentMethodFilter !== 'all' || fromStopFilter !== 'all' || toStopFilter !== 'all' || dateFilter || tripNumberFilter !== 'latest') {
+      setCurrentPage(1);
+      if (searchTerm) {
+        fetchTicketsWithSearch();
+      } else {
+        fetchTicketsWithPagination();
+      }
+    }
+  }, [selectedBus, paymentMethodFilter, fromStopFilter, toStopFilter, dateFilter, tripNumberFilter]);
+
+  // Legacy support - keep some of the old functionality for route stops
   useEffect(() => {
     if (selectedBus) {
-      fetchTicketsByBusAndFilters(selectedBus);
       fetchRouteStops(selectedBus);
       fetchAvailableTrips(selectedBus);
+    } else if (selectedRoute) {
+      // If no bus selected but route is selected, fetch stops for that route
+      fetchRouteStopsById(selectedRoute);
+      setAvailableTrips([]);
     } else {
-      setTickets([]);
-      setRouteStops([]);
+      // If neither bus nor route selected, fetch all stops for search functionality
+      fetchAllRouteStops();
       setAvailableTrips([]);
     }
-  }, [selectedBus, dateFilter, tripNumberFilter]);
+  }, [selectedBus, selectedRoute, dateFilter, tripNumberFilter]);
 
   // Handle click outside to close suggestions
   useEffect(() => {
@@ -83,6 +132,73 @@ export default function TicketsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // New pagination functions
+  const fetchTicketsWithPagination = async () => {
+    setLoading(true);
+    try {
+      console.log(`Fetching tickets for page ${currentPage}`);
+      const filters = buildFilters();
+      const result = await TicketService.getTicketsWithPagination(currentPage, itemsPerPage, '', filters);
+      
+      setTickets(result.tickets);
+      setTotalPages(result.totalPages);
+      setTotalTickets(result.total);
+      setError(null);
+      console.log(`Fetched ${result.tickets.length} tickets, total pages: ${result.totalPages}`);
+    } catch (err) {
+      console.error('Failed to fetch tickets with pagination:', err);
+      setError('Failed to load tickets. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTicketsWithSearch = async () => {
+    setLoading(true);
+    try {
+      console.log(`Searching tickets for "${searchTerm}" on page ${currentPage}`);
+      const filters = buildFilters();
+      const result = await TicketService.getTicketsWithPagination(currentPage, itemsPerPage, searchTerm, filters);
+      
+      setTickets(result.tickets);
+      setTotalPages(result.totalPages);
+      setTotalTickets(result.total);
+      setError(null);
+      
+      if (!result.hasResults && searchTerm) {
+        console.log(`No tickets found for search term: "${searchTerm}"`);
+      }
+    } catch (err) {
+      console.error('Failed to search tickets:', err);
+      setError('Error: Failed to load tickets. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const buildFilters = () => {
+    const filters: any = {};
+    
+    if (selectedBus) {
+      filters.busId = selectedBus;
+    }
+    
+    if (paymentMethodFilter !== 'all') {
+      filters.paymentMethod = paymentMethodFilter;
+    }
+    
+    if (dateFilter) {
+      filters.startDate = dateFilter;
+      filters.endDate = dateFilter;
+    }
+    
+    if (tripNumberFilter !== 'latest' && tripNumberFilter !== 'all') {
+      filters.tripNumber = parseInt(tripNumberFilter);
+    }
+    
+    return filters;
   };
 
   const fetchTicketsByBus = async (busId: string) => {
@@ -132,17 +248,51 @@ export default function TicketsPage() {
 
   const fetchRouteStops = async (busId: string) => {
     try {
-      // Find the selected bus to get its route
-      const selectedBusData = buses.find(bus => bus._id === busId);
-      if (selectedBusData && selectedBusData.routeId) {
+      console.log('Fetching route stops for bus:', busId);
+      
+      // First, get the bus data to find its route
+      const busData = await BusService.getBusById(busId);
+      console.log('Bus data fetched:', busData);
+      
+      if (busData && busData.routeId) {
+        // Handle both populated route object and route ID string
+        const routeId = typeof busData.routeId === 'string' ? busData.routeId : busData.routeId._id;
+        console.log('Fetching stops for route:', routeId);
+        
         // Get stops for the specific route
-        const stopData = await StopService.getStopsByRoute(selectedBusData.routeId);
+        const stopData = await StopService.getStopsByRoute(routeId);
+        console.log('Route stops fetched:', stopData);
         setRouteStops(stopData);
       } else {
+        console.log('Bus has no route assigned');
         setRouteStops([]);
       }
     } catch (err) {
       console.error('Error fetching route stops:', err);
+      setRouteStops([]);
+    }
+  };
+
+  const fetchRouteStopsById = async (routeId: string) => {
+    try {
+      console.log('Fetching stops for route ID:', routeId);
+      const stopData = await StopService.getStopsByRoute(routeId);
+      console.log('Route stops fetched:', stopData);
+      setRouteStops(stopData);
+    } catch (err) {
+      console.error('Error fetching route stops by ID:', err);
+      setRouteStops([]);
+    }
+  };
+
+  const fetchAllRouteStops = async () => {
+    try {
+      console.log('Fetching all stops across all routes');
+      const stopData = await StopService.getAllStops();
+      console.log('All stops fetched:', stopData);
+      setRouteStops(stopData);
+    } catch (err) {
+      console.error('Error fetching all stops:', err);
       setRouteStops([]);
     }
   };
@@ -221,8 +371,11 @@ export default function TicketsPage() {
     if (window.confirm('Are you sure you want to delete this ticket?')) {
       try {
         await TicketService.deleteTicket(ticketId);
-        if (selectedBus) {
-          fetchTicketsByBusAndFilters(selectedBus); // Refresh the list
+        // Refresh the current page
+        if (searchTerm) {
+          fetchTicketsWithSearch();
+        } else {
+          fetchTicketsWithPagination();
         }
       } catch (err: any) {
         alert(err.message || 'Failed to delete ticket');
@@ -234,14 +387,20 @@ export default function TicketsPage() {
     router.push(`/super-admin/tickets/${ticketId}`);
   };
 
-  const getRouteName = (routeId: string) => {
-    const route = routes.find(route => route._id === routeId);
-    return route?.name || route?.routeName || 'Unknown Route';
+  const getRouteName = (routeId: string | { _id: string; routeName: string; routeNumber: string }) => {
+    if (typeof routeId === 'string') {
+      const route = routes.find(route => route._id === routeId);
+      return route?.name || route?.routeName || 'Unknown Route';
+    }
+    return routeId?.routeName || 'Unknown Route';
   };
 
-  const getBusNumber = (busId: string) => {
-    const bus = buses.find(bus => bus._id === busId);
-    return bus?.busNumber || 'Unknown Bus';
+  const getBusNumber = (busId: string | { _id: string; busNumber: string; busName: string }) => {
+    if (typeof busId === 'string') {
+      const bus = buses.find(bus => bus._id === busId);
+      return bus?.busNumber || 'Unknown Bus';
+    }
+    return busId?.busNumber || 'Unknown Bus';
   };
 
   const getStopName = (stopId: string) => {
@@ -270,37 +429,48 @@ export default function TicketsPage() {
     }
   };
 
-  // Filter tickets based on all filters
-  const filteredTickets = tickets.filter(ticket => {
-    const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = 
-      ticket.ticketId?.toLowerCase().includes(searchLower) ||
-      ticket.fromStop?.stopName?.toLowerCase().includes(searchLower) ||
-      ticket.toStop?.stopName?.toLowerCase().includes(searchLower) ||
-      getRouteName(ticket.routeId).toLowerCase().includes(searchLower) ||
-      getBusNumber(ticket.busId).toLowerCase().includes(searchLower);
-    
-    const matchesPaymentMethod = paymentMethodFilter === 'all' || ticket.paymentMethod === paymentMethodFilter;
-    const matchesFromStop = fromStopFilter === 'all' || ticket.fromStop?.stopId === fromStopFilter;
-    const matchesToStop = toStopFilter === 'all' || ticket.toStop?.stopId === toStopFilter;
-    
-    return matchesSearch && matchesPaymentMethod && matchesFromStop && matchesToStop;
-  });
+  // Pagination handlers
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
-  // Get unique stops for dropdowns (from route stops only)
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  // Get unique stops for dropdowns (prioritize route stops, fallback to ticket stops)
   const getUniqueStops = () => {
     const uniqueStopsMap = new Map();
     
-    // Add stops from tickets for the selected bus
+    // First, add all route stops data (preferred source as it's complete)
+    console.log('Route stops for dropdown:', routeStops.length);
+    routeStops.forEach((stop: any) => {
+      uniqueStopsMap.set(stop._id, {
+        _id: stop._id,
+        stopName: stop.stopName,
+        sectionNumber: stop.sectionNumber
+      });
+    });
+    
+    // Then add stops from tickets (only if not already added)
+    // This ensures we have stops even if route stops failed to load
     tickets.forEach(ticket => {
-      if (ticket.fromStop) {
+      if (ticket.fromStop && !uniqueStopsMap.has(ticket.fromStop.stopId)) {
         uniqueStopsMap.set(ticket.fromStop.stopId, {
           _id: ticket.fromStop.stopId,
           stopName: ticket.fromStop.stopName,
           sectionNumber: ticket.fromStop.sectionNumber
         });
       }
-      if (ticket.toStop) {
+      if (ticket.toStop && !uniqueStopsMap.has(ticket.toStop.stopId)) {
         uniqueStopsMap.set(ticket.toStop.stopId, {
           _id: ticket.toStop.stopId,
           stopName: ticket.toStop.stopName,
@@ -309,12 +479,7 @@ export default function TicketsPage() {
       }
     });
     
-    // Add stops from route stops data (for the selected bus's route)
-    routeStops.forEach((stop: any) => {
-      uniqueStopsMap.set(stop._id, stop);
-    });
-    
-    return Array.from(uniqueStopsMap.values()).sort((a: any, b: any) => {
+    const stops = Array.from(uniqueStopsMap.values()).sort((a: any, b: any) => {
       // First sort by section number (ascending)
       if (a.sectionNumber !== b.sectionNumber) {
         return (a.sectionNumber || 0) - (b.sectionNumber || 0);
@@ -322,6 +487,9 @@ export default function TicketsPage() {
       // Then sort by stop name if section numbers are equal
       return a.stopName.localeCompare(b.stopName);
     });
+    
+    console.log('Unique stops for dropdown:', stops.length);
+    return stops;
   };
 
   const uniqueStops = getUniqueStops();
@@ -541,13 +709,18 @@ export default function TicketsPage() {
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2 bg-blue-50 px-4 py-2 rounded-full">
                   <span className="text-blue-600 font-semibold">Total:</span>
-                  <span className="text-blue-800 font-bold">{filteredTickets.length}</span>
+                  <span className="text-blue-800 font-bold">{totalTickets}</span>
                 </div>
                 <Button 
-                  onClick={() => selectedBus ? fetchTicketsByBusAndFilters(selectedBus) : null}
+                  onClick={() => {
+                    if (searchTerm) {
+                      fetchTicketsWithSearch();
+                    } else {
+                      fetchTicketsWithPagination();
+                    }
+                  }}
                   variant="outline"
                   className="flex items-center space-x-2"
-                  disabled={!selectedBus}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
@@ -753,7 +926,6 @@ export default function TicketsPage() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search by ticket ID, route, bus..."
                   className="w-full text-sm px-2 py-1.5"
-                  disabled={!selectedBus}
                 />
               </div>
               
@@ -823,11 +995,11 @@ export default function TicketsPage() {
                     setFromStopFilter('all');
                     setToStopFilter('all');
                     setTripNumberFilter('latest');
+                    setCurrentPage(1);
                     // Don't reset date as it should stay as today by default
                   }}
                   variant="outline"
                   className="w-full flex items-center justify-center space-x-1 text-sm px-2 py-1.5 h-[34px]"
-                  disabled={!selectedBus}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -840,18 +1012,7 @@ export default function TicketsPage() {
 
           {/* Data Table */}
           <div className="p-6">
-            {!selectedBus ? (
-              <div className="text-center py-12">
-                <div className="bg-blue-50 border border-blue-200 text-blue-700 px-6 py-4 rounded-lg inline-block">
-                  <div className="flex items-center space-x-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                    <span className="font-medium">Please select a bus to view its tickets</span>
-                  </div>
-                </div>
-              </div>
-            ) : loading ? (
+            {loading ? (
               <div className="flex justify-center items-center h-64">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
               </div>
@@ -861,19 +1022,99 @@ export default function TicketsPage() {
                   <strong className="font-bold">Error: </strong>
                   <span>{error}</span>
                   <div className="mt-4">
-                    <Button onClick={() => fetchTicketsByBus(selectedBus)} variant="primary">
+                    <Button onClick={() => {
+                      if (searchTerm) {
+                        fetchTicketsWithSearch();
+                      } else {
+                        fetchTicketsWithPagination();
+                      }
+                    }} variant="primary">
                       Retry
                     </Button>
                   </div>
                 </div>
               </div>
             ) : (
-              <DataTable
-                columns={columns}
-                data={filteredTickets}
-                emptyMessage={`No tickets found for the selected bus${fromStopFilter !== 'all' || toStopFilter !== 'all' || paymentMethodFilter !== 'all' || searchTerm ? ' matching your criteria' : ''}`}
-                keyExtractor={(ticket) => ticket._id}
-              />
+              <>
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  <DataTable
+                    columns={columns}
+                    data={tickets}
+                    emptyMessage={searchTerm ? `No tickets found matching "${searchTerm}". Try a different search term.` : "No tickets found for the selected criteria."}
+                    keyExtractor={(ticket) => ticket._id}
+                  />
+                </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="mt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div className="text-sm text-gray-600">
+                      <span>
+                        Showing page {currentPage} of {totalPages} • Total: {totalTickets} tickets
+                        {searchTerm && ` matching "${searchTerm}"`}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      {/* Previous Button */}
+                      <button
+                        onClick={handlePreviousPage}
+                        disabled={currentPage === 1}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                          currentPage === 1
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 shadow-sm'
+                        }`}
+                      >
+                        Previous
+                      </button>
+                      
+                      {/* Page Numbers */}
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                          let pageNum;
+                          if (totalPages <= 5) {
+                            pageNum = i + 1;
+                          } else if (currentPage <= 3) {
+                            pageNum = i + 1;
+                          } else if (currentPage >= totalPages - 2) {
+                            pageNum = totalPages - 4 + i;
+                          } else {
+                            pageNum = currentPage - 2 + i;
+                          }
+                          
+                          return (
+                            <button
+                              key={pageNum}
+                              onClick={() => handlePageChange(pageNum)}
+                              className={`px-3 py-2 rounded-lg font-medium transition-all ${
+                                pageNum === currentPage
+                                  ? 'bg-blue-600 text-white shadow-lg'
+                                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 shadow-sm'
+                              }`}
+                            >
+                              {pageNum}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      
+                      {/* Next Button */}
+                      <button
+                        onClick={handleNextPage}
+                        disabled={currentPage === totalPages}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                          currentPage === totalPages
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 shadow-sm'
+                        }`}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
