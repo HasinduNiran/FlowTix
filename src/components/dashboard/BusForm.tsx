@@ -75,6 +75,9 @@ export default function BusForm({
 
   useEffect(() => {
     if (initialData && isEditing) {
+      // Map maintenance status to inactive for the form
+      let status: 'active' | 'inactive' = initialData.status === 'maintenance' ? 'inactive' : (initialData.status as 'active' | 'inactive');
+      
       setFormData({
         busNumber: initialData.busNumber,
         busName: initialData.busName,
@@ -85,7 +88,7 @@ export default function BusForm({
         seatCapacity: initialData.seatCapacity,
         driverName: initialData.driverName,
         conductorId: typeof initialData.conductorId === 'string' ? initialData.conductorId : initialData.conductorId._id,
-        status: initialData.status,
+        status: status,
         notes: initialData.notes || ''
       });
 
@@ -408,19 +411,43 @@ export default function BusForm({
       conductorValid: conductorValidation.isValid,
       conductorHasId: !!formData.conductorId,
       routeValid: routeValidation.isValid,
-      routeHasId: !!formData.routeId
+      routeHasId: !!formData.routeId,
+      busNumberValid: busNumberValidation.isValid,
+      telephoneValid: telephoneValidation.isValid
     });
     
     setIsSubmitting(true);
     setError(null);
 
-    // Validate that owner and conductor are properly set
+    // Validate that bus information is provided
+    if (!formData.busNumber || !formData.busName) {
+      setError('Please enter bus number and name');
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Validate bus number format
+    if (!busNumberValidation.isValid) {
+      setError('Please enter a valid bus number in format XX-#### (e.g., KP-5677)');
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Validate telephone number
+    if (!telephoneValidation.isValid) {
+      setError('Please enter a valid 10-digit telephone number');
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Validate that owner is properly set
     if (!ownerValidation.isValid || !formData.ownerId) {
       setError('Please enter a valid owner username');
       setIsSubmitting(false);
       return;
     }
 
+    // Validate that conductor is properly set
     if (!conductorValidation.isValid || !formData.conductorId) {
       setError('Please enter a valid conductor username');
       setIsSubmitting(false);
@@ -434,25 +461,42 @@ export default function BusForm({
       return;
     }
 
-    // Validate bus number format
-    if (!busNumberValidation.isValid || !formData.busNumber) {
-      setError('Please enter a valid bus number in format XX-#### (e.g., KP-5677)');
+    // Validate seat capacity
+    if (!formData.seatCapacity || formData.seatCapacity <= 0) {
+      setError('Please enter a valid seat capacity');
       setIsSubmitting(false);
       return;
     }
 
-    // Validate telephone number
-    if (!telephoneValidation.isValid || !formData.telephoneNumber) {
-      setError('Please enter a valid 10-digit telephone number');
+    // Validate driver name
+    if (!formData.driverName) {
+      setError('Please enter driver name');
       setIsSubmitting(false);
       return;
     }
 
     try {
+      // Note: If initialData had 'maintenance' status, we're submitting as 'inactive' now
+      // The backend should maintain the original status if it needs to
       await onSubmit(formData);
       router.push('/super-admin/buses');
     } catch (err: any) {
-      setError(err.message || 'An error occurred while saving the bus');
+      console.error('Error submitting form:', err);
+      let errorMessage = 'An error occurred while saving the bus';
+      
+      // Handle different types of errors
+      if (err.message) {
+        if (typeof err.message === 'string') {
+          errorMessage = err.message;
+        } else if (err.response && err.response.data && err.response.data.message) {
+          errorMessage = err.response.data.message;
+        }
+      }
+      
+      setError(errorMessage);
+      
+      // Scroll to the top where the error is displayed
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsSubmitting(false);
     }
@@ -494,6 +538,9 @@ export default function BusForm({
                 <p className="text-gray-600">
                   {isEditing ? 'Update bus information and settings' : 'Create a new bus entry in the system'}
                 </p>
+                <p className="text-sm text-gray-500 mt-2">
+                  Fields marked with * are required
+                </p>
               </div>
             </div>
           </div>
@@ -502,11 +549,14 @@ export default function BusForm({
         {/* Form */}
         <div className="bg-white shadow-lg rounded-2xl p-8 border border-gray-200">
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-2xl flex items-center">
-              <svg className="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r-2xl shadow-sm flex items-center animate-pulse">
+              <svg className="w-6 h-6 mr-3 flex-shrink-0 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zm-1 4a1 1 0 00-1 1v3a1 1 0 102 0v-3a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
-              {error}
+              <div>
+                <p className="font-medium">{error}</p>
+                <p className="text-sm text-red-600 mt-1">Please correct the errors and try again.</p>
+              </div>
             </div>
           )}
 
@@ -525,7 +575,7 @@ export default function BusForm({
                 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                    <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
                       <svg className="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
                       </svg>
@@ -573,7 +623,7 @@ export default function BusForm({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                    <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
                       <svg className="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                       </svg>
@@ -590,7 +640,7 @@ export default function BusForm({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                    <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
                       <svg className="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                       </svg>
@@ -612,7 +662,7 @@ export default function BusForm({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                    <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
                       <svg className="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                       </svg>
@@ -645,7 +695,7 @@ export default function BusForm({
                 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                    <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
                       <svg className="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                       </svg>
@@ -693,7 +743,7 @@ export default function BusForm({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                    <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
                       <svg className="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
@@ -710,7 +760,7 @@ export default function BusForm({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                    <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
                       <svg className="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
                       </svg>
@@ -724,15 +774,20 @@ export default function BusForm({
                           setOwnerUsername(e.target.value);
                           setShowOwnerSuggestions(true);
                           setError(null);
+                          // Reset validation if user changes the value
+                          if (ownerValidation.isValid) {
+                            setOwnerValidation({ isValid: false, message: '', isLoading: false });
+                            setFormData(prev => ({ ...prev, ownerId: '' }));
+                          }
                         }}
                         onFocus={() => {
                           if (ownerSuggestions.length > 0) {
                             setShowOwnerSuggestions(true);
                           }
                         }}
-                        onBlur={() => {
-                          // Delay hiding suggestions to allow clicking
-                          setTimeout(() => setShowOwnerSuggestions(false), 200);
+                        onBlur={(e) => {
+                          // Use a slightly longer delay to ensure click event happens first
+                          setTimeout(() => setShowOwnerSuggestions(false), 300);
                         }}
                         placeholder="e.g., john_owner"
                         required
@@ -754,7 +809,8 @@ export default function BusForm({
                             <div
                               key={user._id}
                               className="px-4 py-3 hover:bg-green-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
-                              onClick={() => {
+                              onMouseDown={(e) => {
+                                e.preventDefault(); // Prevent blur event from firing first
                                 setOwnerUsername(user.username);
                                 setFormData(prev => ({ ...prev, ownerId: user._id }));
                                 setOwnerValidation({ isValid: true, message: 'Valid owner', isLoading: false });
@@ -805,7 +861,7 @@ export default function BusForm({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                    <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
                       <svg className="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
@@ -819,15 +875,20 @@ export default function BusForm({
                           setConductorUsername(e.target.value);
                           setShowConductorSuggestions(true);
                           setError(null);
+                          // Reset validation if user changes the value
+                          if (conductorValidation.isValid) {
+                            setConductorValidation({ isValid: false, message: '', isLoading: false });
+                            setFormData(prev => ({ ...prev, conductorId: '' }));
+                          }
                         }}
                         onFocus={() => {
                           if (conductorSuggestions.length > 0) {
                             setShowConductorSuggestions(true);
                           }
                         }}
-                        onBlur={() => {
-                          // Delay hiding suggestions to allow clicking
-                          setTimeout(() => setShowConductorSuggestions(false), 200);
+                        onBlur={(e) => {
+                          // Use a slightly longer delay to ensure click event happens first
+                          setTimeout(() => setShowConductorSuggestions(false), 300);
                         }}
                         placeholder="e.g., jane_conductor"
                         required
@@ -849,7 +910,8 @@ export default function BusForm({
                             <div
                               key={user._id}
                               className="px-4 py-3 hover:bg-green-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
-                              onClick={() => {
+                              onMouseDown={(e) => {
+                                e.preventDefault(); // Prevent blur event from firing first
                                 setConductorUsername(user.username);
                                 setFormData(prev => ({ ...prev, conductorId: user._id }));
                                 setConductorValidation({ isValid: true, message: 'Valid conductor', isLoading: false });
@@ -934,7 +996,7 @@ export default function BusForm({
                 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                    <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
                       <svg className="w-4 h-4 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -949,15 +1011,20 @@ export default function BusForm({
                           setRouteNumber(e.target.value);
                           setShowRouteSuggestions(true);
                           setError(null);
+                          // Reset validation if user changes the value
+                          if (routeValidation.isValid) {
+                            setRouteValidation({ isValid: false, message: '', isLoading: false });
+                            setFormData(prev => ({ ...prev, routeId: '' }));
+                          }
                         }}
                         onFocus={() => {
                           if (routeSuggestions.length > 0) {
                             setShowRouteSuggestions(true);
                           }
                         }}
-                        onBlur={() => {
-                          // Delay hiding suggestions to allow clicking
-                          setTimeout(() => setShowRouteSuggestions(false), 200);
+                        onBlur={(e) => {
+                          // Use a slightly longer delay to ensure click event happens first
+                          setTimeout(() => setShowRouteSuggestions(false), 300);
                         }}
                         placeholder="e.g., CE-001"
                         required
@@ -979,7 +1046,8 @@ export default function BusForm({
                             <div
                               key={route._id}
                               className="px-4 py-3 hover:bg-purple-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
-                              onClick={() => {
+                              onMouseDown={(e) => {
+                                e.preventDefault(); // Prevent blur event from firing first
                                 setRouteNumber(route.code);
                                 setFormData(prev => ({ ...prev, routeId: route._id }));
                                 setRouteValidation({ isValid: true, message: 'Valid route', isLoading: false });
@@ -1031,7 +1099,7 @@ export default function BusForm({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                    <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
                       <svg className="w-4 h-4 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -1062,7 +1130,7 @@ export default function BusForm({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                    <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
                       <svg className="w-4 h-4 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
