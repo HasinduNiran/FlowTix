@@ -331,7 +331,8 @@ export default function StopForm({
                               <div
                                 key={route._id}
                                 className="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
-                                onClick={() => {
+                                onMouseDown={(e) => {
+                                  e.preventDefault(); // Prevent blur event
                                   setFormData({ ...formData, routeId: route._id });
                                   setRouteSearchTerm(`${route.code} - ${route.name}`);
                                   setShowRouteSuggestions(false);

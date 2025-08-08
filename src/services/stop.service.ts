@@ -25,14 +25,61 @@ export interface CreateStopData {
 
 export interface UpdateStopData extends Partial<CreateStopData> {}
 
+export interface StopsResponse {
+  data: Stop[];
+  count: number;
+  totalPages: number;
+  currentPage: number;
+}
+
 export const StopService = {
   // Get all stops
-  async getAllStops(): Promise<Stop[]> {
+  async getAllStops(limit: number = 100): Promise<Stop[]> {
     try {
-      const response = await api.get('/stops');
+      const response = await api.get(`/stops?limit=${limit}`);
       return response.data.data || [];
     } catch (error) {
       console.error('Error fetching stops:', error);
+      throw error;
+    }
+  },
+  
+  // Get stops with pagination and filtering
+  async getStopsWithPagination(options: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    routeId?: string;
+    isActive?: boolean | string;
+    sort?: string;
+    order?: 'asc' | 'desc';
+  }): Promise<StopsResponse> {
+    try {
+      const { page = 1, limit = 15, search, routeId, isActive, sort, order } = options;
+      
+      // Build query parameters
+      const params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('limit', limit.toString());
+      
+      if (search) params.append('search', search);
+      if (routeId && routeId !== 'all') params.append('routeId', routeId);
+      if (isActive !== undefined && isActive !== 'all') {
+        params.append('isActive', isActive === 'active' ? 'true' : 'false');
+      }
+      if (sort) params.append('sort', sort);
+      if (order) params.append('order', order);
+      
+      const response = await api.get(`/stops?${params.toString()}`);
+      
+      return {
+        data: response.data.data || [],
+        count: response.data.count || 0,
+        totalPages: response.data.totalPages || 1,
+        currentPage: response.data.currentPage || 1
+      };
+    } catch (error) {
+      console.error('Error fetching stops with pagination:', error);
       throw error;
     }
   },

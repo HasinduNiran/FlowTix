@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { StopService, Stop } from '@/services/stop.service';
 import { RouteService, Route } from '@/services/route.service';
 import { Button } from '@/components/ui/Button';
+import StopModal from '@/components/dashboard/StopModal';
 
 export default function StopsPage() {
   const [stops, setStops] = useState<Stop[]>([]);
@@ -13,7 +14,7 @@ export default function StopsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRoute, setSelectedRoute] = useState('');
+  const [selectedRoute, setSelectedRoute] = useState(''); // Empty by default, user must select a route
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [sectionSortOrder, setSectionSortOrder] = useState<'asc' | 'desc' | null>(null);
   const [stopNameSortOrder, setStopNameSortOrder] = useState<'asc' | 'desc' | null>(null);
@@ -21,15 +22,22 @@ export default function StopsPage() {
   const [routeSearchTerm, setRouteSearchTerm] = useState('');
   const [showRouteSuggestions, setShowRouteSuggestions] = useState(false);
   const [filteredRoutes, setFilteredRoutes] = useState<Route[]>([]);
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalStops, setTotalStops] = useState<number>(0);
+  const itemsPerPage = 15;
+  
+  // Modal state
+  const [showAddModal, setShowAddModal] = useState(false);
+  
   const router = useRouter();
 
   useEffect(() => {
+    // Only fetch data if a route is selected or to get the initial routes list
     fetchData();
-  }, []);
-
-  useEffect(() => {
-    filterStops();
-  }, [stops, searchTerm, selectedRoute, selectedStatus, sectionSortOrder, stopNameSortOrder, routeSortOrder]);
+  }, [currentPage, searchTerm, selectedRoute, selectedStatus, sectionSortOrder, stopNameSortOrder, routeSortOrder]);
 
   useEffect(() => {
     // Filter routes based on search term
@@ -39,126 +47,119 @@ export default function StopsPage() {
         route.name.toLowerCase().includes(routeSearchTerm.toLowerCase())
       );
       setFilteredRoutes(filtered.slice(0, 5)); // Limit to 5 suggestions
+      setShowRouteSuggestions(true); // Show suggestions when typing
     } else {
       setFilteredRoutes([]);
+      setShowRouteSuggestions(false);
     }
   }, [routeSearchTerm, routes]);
+
+  // Reset to page 1 when filters change (but not when page changes)
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedRoute, selectedStatus, searchTerm]);
+
+  const handleStopAdded = () => {
+    fetchData(); // Reload data after adding new stop
+  };
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [stopsData, routesData] = await Promise.all([
-        StopService.getAllStops(),
-        RouteService.getAllRoutes()
-      ]);
-      setStops(stopsData);
+      
+      // Always fetch routes
+      const routesData = await RouteService.getAllRoutes();
       setRoutes(routesData);
-      setError(null);
+      
+      // Only fetch stops if a route is selected
+      if (selectedRoute) {
+        const stopsResponse = await StopService.getStopsWithPagination({
+          page: currentPage,
+          limit: itemsPerPage,
+          search: searchTerm,
+          routeId: selectedRoute, // Always pass the selected route
+          isActive: selectedStatus !== 'all' ? selectedStatus : undefined,
+          sort: sectionSortOrder ? 'sectionNumber' : 
+                stopNameSortOrder ? 'stopName' : 
+                routeSortOrder ? 'routeId' : 'stopName',
+          order: sectionSortOrder || stopNameSortOrder || routeSortOrder || 'asc'
+        });
+        
+        setStops(stopsResponse.data);
+        setFilteredStops(stopsResponse.data);
+        setTotalStops(stopsResponse.count);
+        setTotalPages(stopsResponse.totalPages);
+        
+        if (currentPage > stopsResponse.totalPages && stopsResponse.totalPages > 0) {
+          setCurrentPage(1); // Reset to page 1 if current page is out of bounds
+        }
+        
+        setError(null);
+      } else {
+        // Clear stops when no route is selected
+        setStops([]);
+        setFilteredStops([]);
+        setTotalStops(0);
+        setTotalPages(1);
+      }
     } catch (err) {
+      console.error('Error fetching data:', err);
       setError('Failed to fetch data. Please try again later.');
-      console.error(err);
+      setStops([]);
+      setFilteredStops([]);
     } finally {
       setLoading(false);
     }
   };
 
+  // We no longer need to filter stops manually since filtering is handled by the backend API
   const filterStops = () => {
-    // Don't show any stops by default - only when a route is selected
-    if (!selectedRoute) {
+    // This is now just a placeholder to maintain compatibility
+    // All filtering is now done in the fetchData method via API parameters
+    if (!stops) {
       setFilteredStops([]);
-      return;
+    } else {
+      setFilteredStops(stops);
     }
-
-    let filtered = stops;
-
-    if (searchTerm) {
-      filtered = filtered.filter(stop =>
-        stop.stopName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        stop.stopCode.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    if (selectedRoute && selectedRoute !== 'all') {
-      filtered = filtered.filter(stop =>
-        stop.routeId && (typeof stop.routeId === 'string' ? stop.routeId === selectedRoute : stop.routeId._id === selectedRoute)
-      );
-    }
-
-    if (selectedStatus !== 'all') {
-      filtered = filtered.filter(stop => 
-        selectedStatus === 'active' ? stop.isActive : !stop.isActive
-      );
-    }
-
-    // Apply section number sorting
-    if (sectionSortOrder) {
-      filtered = filtered.sort((a, b) => {
-        if (sectionSortOrder === 'asc') {
-          return a.sectionNumber - b.sectionNumber;
-        } else {
-          return b.sectionNumber - a.sectionNumber;
-        }
-      });
-    }
-
-    // Apply stop name sorting
-    if (stopNameSortOrder) {
-      filtered = filtered.sort((a, b) => {
-        if (stopNameSortOrder === 'asc') {
-          return a.stopName.localeCompare(b.stopName);
-        } else {
-          return b.stopName.localeCompare(a.stopName);
-        }
-      });
-    }
-
-    // Apply route sorting
-    if (routeSortOrder) {
-      filtered = filtered.sort((a, b) => {
-        const routeA = getRouteDisplay(a.routeId!);
-        const routeB = getRouteDisplay(b.routeId!);
-        if (routeSortOrder === 'asc') {
-          return routeA.localeCompare(routeB);
-        } else {
-          return routeB.localeCompare(routeA);
-        }
-      });
-    }
-
-    setFilteredStops(filtered);
   };
 
   const handleSectionSort = () => {
-    if (sectionSortOrder === null || sectionSortOrder === 'desc') {
-      setSectionSortOrder('asc');
-    } else {
-      setSectionSortOrder('desc');
-    }
+    // Set new sort order
+    const newOrder = (sectionSortOrder === null || sectionSortOrder === 'desc') ? 'asc' : 'desc';
+    
     // Clear other sort orders
     setStopNameSortOrder(null);
     setRouteSortOrder(null);
+    setSectionSortOrder(newOrder);
+    
+    // Reset to first page when sorting
+    setCurrentPage(1);
   };
 
   const handleStopNameSort = () => {
-    if (stopNameSortOrder === null || stopNameSortOrder === 'desc') {
-      setStopNameSortOrder('asc');
-    } else {
-      setStopNameSortOrder('desc');
-    }
+    // Set new sort order
+    const newOrder = (stopNameSortOrder === null || stopNameSortOrder === 'desc') ? 'asc' : 'desc';
+    
     // Clear other sort orders
     setSectionSortOrder(null);
     setRouteSortOrder(null);
+    setStopNameSortOrder(newOrder);
+    
+    // Reset to first page when sorting
+    setCurrentPage(1);
   };
 
   const handleRouteSort = () => {
-    if (routeSortOrder === null || routeSortOrder === 'desc') {
-      setRouteSortOrder('asc');
-    } else {
-      setRouteSortOrder('desc');
-    }
+    // Set new sort order
+    const newOrder = (routeSortOrder === null || routeSortOrder === 'desc') ? 'asc' : 'desc';
+    
     // Clear other sort orders
     setSectionSortOrder(null);
     setStopNameSortOrder(null);
+    setRouteSortOrder(newOrder);
+    
+    // Reset to first page when sorting
+    setCurrentPage(1);
   };
 
   const handleDeleteStop = async (stopId: string) => {
@@ -166,7 +167,8 @@ export default function StopsPage() {
 
     try {
       await StopService.deleteStop(stopId);
-      setStops(stops.filter(stop => stop._id !== stopId));
+      // Refresh data to get updated list from the backend
+      fetchData();
     } catch (err) {
       setError('Failed to delete stop. Please try again.');
       console.error('Error deleting stop:', err);
@@ -179,6 +181,36 @@ export default function StopsPage() {
       return route ? `${route.code} - ${route.name}` : 'Unknown Route';
     }
     return `${routeId.routeNumber} - ${routeId.routeName}`;
+  };
+
+  // Pagination handlers
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const getSelectedRouteDisplay = () => {
+    if (!selectedRoute || selectedRoute === '') {
+      return '';
+    }
+    if (selectedRoute === 'all') {
+      return 'All Routes';
+    }
+    const route = routes.find(r => r._id === selectedRoute);
+    return route ? `${route.code} - ${route.name}` : '';
   };
 
   if (loading) {
@@ -216,7 +248,7 @@ export default function StopsPage() {
                 </div>
               </div>
               <Button 
-                onClick={() => router.push('/super-admin/stops/create')}
+                onClick={() => setShowAddModal(true)}
                 className="bg-red-600 hover:bg-red-700 shadow-md hover:shadow-lg transition-all duration-200"
               >
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -242,49 +274,48 @@ export default function StopsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Route <span className="text-red-500">*</span></label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <span className="flex items-center">
+                  Route Filter <span className="text-red-500 ml-1">*</span>
+                  <span className="ml-2 text-xs bg-red-100 text-red-700 px-2 py-1 rounded">Required</span>
+                </span>
+              </label>
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Type route number or name..."
-                  value={routeSearchTerm}
+                  placeholder="Select a route to view stops..."
+                  value={routeSearchTerm || getSelectedRouteDisplay()}
                   onChange={(e) => {
                     setRouteSearchTerm(e.target.value);
                     setShowRouteSuggestions(true);
+                    // Clear selected route if input is cleared
+                    if (!e.target.value) {
+                      setSelectedRoute('');
+                    }
                   }}
                   onFocus={() => {
-                    if (filteredRoutes.length > 0) {
+                    if (filteredRoutes.length > 0 || routeSearchTerm.trim() || routes.length > 0) {
                       setShowRouteSuggestions(true);
                     }
                   }}
                   onBlur={() => {
                     // Delay hiding to allow clicking on suggestions
-                    setTimeout(() => setShowRouteSuggestions(false), 200);
+                    setTimeout(() => setShowRouteSuggestions(false), 300);
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
                 />
                 
                 {/* Route Suggestions Dropdown */}
-                {showRouteSuggestions && filteredRoutes.length > 0 && (
+                {showRouteSuggestions && (routeSearchTerm ? filteredRoutes.length > 0 : routes.length > 0) && (
                   <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                    <div
-                      className="px-3 py-2 hover:bg-red-50 cursor-pointer border-b border-gray-100 transition-colors"
-                      onClick={() => {
-                        setSelectedRoute('all');
-                        setRouteSearchTerm('All Routes');
-                        setShowRouteSuggestions(false);
-                      }}
-                    >
-                      <div className="font-medium text-gray-900">All Routes</div>
-                      <div className="text-sm text-gray-500">Show all available routes</div>
-                    </div>
-                    {filteredRoutes.map((route) => (
+                    {(routeSearchTerm ? filteredRoutes : routes.slice(0, 10)).map((route) => (
                       <div
                         key={route._id}
                         className="px-3 py-2 hover:bg-red-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
-                        onClick={() => {
+                        onMouseDown={(e) => {
+                          e.preventDefault(); // Prevent blur event
                           setSelectedRoute(route._id);
-                          setRouteSearchTerm(`${route.code} - ${route.name}`);
+                          setRouteSearchTerm('');
                           setShowRouteSuggestions(false);
                         }}
                       >
@@ -298,13 +329,14 @@ export default function StopsPage() {
                 )}
                 
                 {/* Clear route button */}
-                {routeSearchTerm && (
+                {(routeSearchTerm || selectedRoute) && (
                   <button
                     type="button"
                     onClick={() => {
                       setRouteSearchTerm('');
                       setSelectedRoute('');
                       setShowRouteSuggestions(false);
+                      setFilteredRoutes([]);
                     }}
                     className="absolute right-2 top-2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
                   >
@@ -348,9 +380,37 @@ export default function StopsPage() {
           </div>
         )}
 
+        {/* Status and Pagination Info */}
+        {!loading && (
+          <div className="mb-6 p-4 bg-white rounded-2xl shadow-md border border-gray-200">
+            <div className="flex justify-between items-center">
+              <div className="text-sm text-gray-600">
+                Showing <span className="font-medium text-gray-900">{filteredStops.length}</span> stops
+                {totalStops > 0 && (
+                  <> out of <span className="font-medium text-gray-900">{totalStops}</span> total</>
+                )}
+                {selectedRoute !== 'all' && selectedRoute !== '' && (
+                  <> in route <span className="font-medium text-gray-900">{getSelectedRouteDisplay()}</span></>
+                )}
+                {selectedStatus !== 'all' && (
+                  <> with status <span className="font-medium text-gray-900">{selectedStatus}</span></>
+                )}
+                {searchTerm && (
+                  <> matching <span className="font-medium text-gray-900">"{searchTerm}"</span></>
+                )}
+              </div>
+              <div className="text-sm text-gray-600">
+                Page <span className="font-medium text-gray-900">{currentPage}</span> of{" "}
+                <span className="font-medium text-gray-900">{totalPages || 1}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Stops Table */}
-        <div className="bg-white shadow-lg rounded-2xl border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
+        {(filteredStops.length > 0 || loading) && (
+          <div className="bg-white shadow-lg rounded-2xl border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -432,7 +492,17 @@ export default function StopsPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredStops.map((stop) => (
+                {loading ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-8 text-center">
+                      <div className="flex items-center justify-center">
+                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+                        <span className="ml-3 text-gray-600">Loading stops...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredStops.map((stop) => (
                   <tr key={stop._id} className="hover:bg-gray-50 transition-colors duration-200">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -497,11 +567,101 @@ export default function StopsPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                ))
+                )}
               </tbody>
             </table>
           </div>
         </div>
+        )}
+
+        {/* Status and Pagination Info */}
+        {!loading && (
+          <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-full">
+                <svg className="h-5 w-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <p className="text-blue-800 font-medium text-lg">
+                {`Showing ${filteredStops.length} of ${totalStops} stops for ${getSelectedRouteDisplay()}
+                ${selectedStatus !== 'all' ? ` (${selectedStatus} only)` : ''}
+                ${totalPages > 1 ? ` (Page ${currentPage} of ${totalPages})` : ''}`}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && !loading && (
+          <div className="flex items-center justify-between mt-6 px-4 py-3 bg-white border border-gray-200 rounded-lg">
+            <div className="flex items-center text-sm text-gray-700">
+              <span>
+                Showing page {currentPage} of {totalPages} ({itemsPerPage} items per page)
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handlePreviousPage}
+                disabled={currentPage === 1}
+                className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                  currentPage === 1
+                    ? 'text-gray-400 cursor-not-allowed'
+                    : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                Previous
+              </button>
+              
+              <div className="flex space-x-1">
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                  const page = i + 1;
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => handlePageChange(page)}
+                      className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                        currentPage === page
+                          ? 'bg-red-600 text-white'
+                          : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                })}
+                {totalPages > 5 && (
+                  <>
+                    <span className="px-2 py-2 text-gray-500">...</span>
+                    <button
+                      onClick={() => handlePageChange(totalPages)}
+                      className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                        currentPage === totalPages
+                          ? 'bg-red-600 text-white'
+                          : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {totalPages}
+                    </button>
+                  </>
+                )}
+              </div>
+              
+              <button
+                onClick={handleNextPage}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                  currentPage === totalPages
+                    ? 'text-gray-400 cursor-not-allowed'
+                    : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
 
         {filteredStops.length === 0 && !loading && (
           <div className="bg-white shadow-lg rounded-2xl p-12 text-center border border-gray-200">
@@ -511,21 +671,54 @@ export default function StopsPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 616 0z" />
               </svg>
             </div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">No stops found</h3>
-            <p className="text-gray-600 mb-6">
-              {searchTerm || selectedRoute || selectedStatus !== 'all' 
-                ? 'Try adjusting your filters to see more results.' 
-                : 'Get started by creating your first bus stop.'}
-            </p>
-            <Button 
-              onClick={() => router.push('/super-admin/stops/create')}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Add New Stop
-            </Button>
+            {!selectedRoute ? (
+              <>
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">Please Select a Route First</h3>
+                <p className="text-gray-600 mb-6">
+                  You must select a route to view its stops. Use the Route Filter above to select a route.
+                </p>
+                <div className="flex justify-center">
+                  <div className="animate-pulse flex items-center mt-4">
+                    <svg className="w-6 h-6 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+                    </svg>
+                    <span className="text-red-500 font-medium">Select a route above</span>
+                  </div>
+                </div>
+              </>
+            ) : filteredStops.length === 0 && totalStops === 0 ? (
+              <>
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">No Stops Available</h3>
+                <p className="text-gray-600 mb-6">
+                  No bus stops have been created yet for the selected route: <span className="font-medium">{getSelectedRouteDisplay()}</span>
+                </p>
+                <Button 
+                  onClick={() => setShowAddModal(true)}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Add New Stop
+                </Button>
+              </>
+            ) : (
+              <>
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">No stops found</h3>
+                <p className="text-gray-600 mb-6">
+                  {searchTerm || selectedStatus !== 'all' 
+                    ? 'Try adjusting your filters to see more results.' 
+                    : `No stops found for the selected route: ${getSelectedRouteDisplay()}`}
+                </p>
+              </>
+            )}
           </div>
         )}
       </div>
+      
+      {/* Add Stop Modal */}
+      <StopModal 
+        isOpen={showAddModal} 
+        onClose={() => setShowAddModal(false)}
+        onStopAdded={handleStopAdded}
+      />
     </div>
   );
 }
