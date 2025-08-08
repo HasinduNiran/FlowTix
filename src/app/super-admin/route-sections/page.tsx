@@ -6,12 +6,19 @@ import { RouteService, type Route } from '@/services/route.service';
 import { StopService, type Stop } from '@/services/stop.service';
 import { Toast } from '@/components/ui/Toast';
 
-// RouteSectionsManager component
+  // RouteSectionsManager component
 function RouteSectionsManager() {
   const [routeSections, setRouteSections] = useState<RouteSection[]>([]);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [stops, setStops] = useState<Stop[]>([]);
   const [filteredStops, setFilteredStops] = useState<Stop[]>([]);
+  const [filteredRoutes, setFilteredRoutes] = useState<Route[]>([]);
+  const [routeSearchTerm, setRouteSearchTerm] = useState('');
+  const [isRouteDropdownOpen, setIsRouteDropdownOpen] = useState(false);
+  const [formRouteSearchTerm, setFormRouteSearchTerm] = useState('');
+  const [isFormRouteDropdownOpen, setIsFormRouteDropdownOpen] = useState(false);
+  const [generateRouteSearchTerm, setGenerateRouteSearchTerm] = useState('');
+  const [isGenerateRouteDropdownOpen, setIsGenerateRouteDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectedRouteSection, setSelectedRouteSection] = useState<RouteSection | null>(null);
@@ -26,9 +33,7 @@ function RouteSectionsManager() {
     category: 'normal',
     fareMultiplier: 1.0,
     overwriteExisting: false
-  });
-
-  // Pagination state
+  });  // Pagination state
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 15, // Changed to 15 items per page as requested
@@ -73,6 +78,38 @@ function RouteSectionsManager() {
     fetchInitialData();
   }, []);
 
+  // Helper function for route filtering
+  const filterRoutesByTerm = (term: string) => {
+    if (term === '') {
+      return routes;
+    } else {
+      return routes.filter(route => 
+        (route.routeName && route.routeName.toLowerCase().includes(term.toLowerCase())) ||
+        (route.routeNumber && route.routeNumber.toLowerCase().includes(term.toLowerCase())) ||
+        (route.code && route.code.toLowerCase().includes(term.toLowerCase())) ||
+        (route.name && route.name.toLowerCase().includes(term.toLowerCase())) ||
+        (route.startPoint && route.startPoint.toLowerCase().includes(term.toLowerCase())) ||
+        (route.endPoint && route.endPoint.toLowerCase().includes(term.toLowerCase())) ||
+        (route.startLocation && route.startLocation.toLowerCase().includes(term.toLowerCase())) ||
+        (route.endLocation && route.endLocation.toLowerCase().includes(term.toLowerCase()))
+      );
+    }
+  };
+  
+  // Filter routes based on search term for main dropdown
+  useEffect(() => {
+    setFilteredRoutes(filterRoutesByTerm(routeSearchTerm));
+  }, [routeSearchTerm, routes]);
+  
+  // Filter routes based on search term for form dropdowns
+  useEffect(() => {
+    if (formRouteSearchTerm) {
+      setFilteredRoutes(filterRoutesByTerm(formRouteSearchTerm));
+    } else if (generateRouteSearchTerm) {
+      setFilteredRoutes(filterRoutesByTerm(generateRouteSearchTerm));
+    }
+  }, [formRouteSearchTerm, generateRouteSearchTerm, routes]);
+
   // Debug logging
   useEffect(() => {
     console.log('Current filterRoute:', filterRoute);
@@ -97,6 +134,7 @@ function RouteSectionsManager() {
       console.log('Fetched route sections:', routeSectionsData);
 
       setRoutes(routesData);
+      setFilteredRoutes(routesData); // Initialize filtered routes with all routes
       setStops(stopsData);
       setRouteSections(routeSectionsData); // Load all route sections initially
       setFilterRoute('all'); // Set default filter to show all routes
@@ -316,20 +354,24 @@ function RouteSectionsManager() {
     });
     setSelectedRouteSection(null);
     setFilteredStops([]); // Clear filtered stops when resetting form
+    setFormRouteSearchTerm(''); // Clear form route search
+    setIsFormRouteDropdownOpen(false);
+    setGenerateRouteSearchTerm(''); // Clear generate route search
+    setIsGenerateRouteDropdownOpen(false);
   };
 
   const filteredAndSortedRouteSections = routeSections
     .filter(rs => {
       const matchesSearch = searchTerm === '' || 
-        rs.stopId.stopName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        rs.category.toLowerCase().includes(searchTerm.toLowerCase());
+        (rs.stopId && rs.stopId.stopName ? rs.stopId.stopName.toLowerCase().includes(searchTerm.toLowerCase()) : false) ||
+        (rs.category ? rs.category.toLowerCase().includes(searchTerm.toLowerCase()) : false);
       
       // If filterRoute is empty (Select a Route), show nothing
       // If filterRoute is 'all', show all route sections
       // Otherwise, filter by specific route ID
       const matchesRoute = filterRoute === '' ? false : 
                           filterRoute === 'all' ? true : 
-                          rs.routeId._id === filterRoute;
+                          (rs.routeId && rs.routeId._id ? rs.routeId._id === filterRoute : false);
       
       return matchesSearch && matchesRoute;
     })
@@ -448,41 +490,86 @@ function RouteSectionsManager() {
                 
                 <div className="relative flex-grow lg:w-80">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                    <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
                     </svg>
                   </div>
-                  <select
-                    value={filterRoute}
-                    onChange={(e) => {
-                      const selectedRoute = e.target.value;
-                      console.log('Route filter changed to:', selectedRoute);
-                      setFilterRoute(selectedRoute);
-                      
-                      if (selectedRoute === '') {
-                        // "Select a Route" - clear route sections
-                        console.log('Clearing route sections - user must select a route');
-                        setRouteSections([]);
-                      } else if (selectedRoute === 'all') {
-                        // "All Routes" selected - fetch all route sections
-                        console.log('Fetching all route sections');
-                        fetchAllRouteSections();
-                      } else {
-                        // Specific route selected - fetch sections for that route only
-                        console.log('Fetching sections for specific route:', selectedRoute);
-                        fetchRouteSections(selectedRoute);
-                      }
-                    }}
-                    className="pl-12 pr-4 py-3 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white appearance-none"
-                  >
-                    <option value="">Select a Route</option>
-                    <option value="all">All Routes</option>
-                    {routes.map((route) => (
-                      <option key={route._id} value={route._id}>
-                        {route.routeNumber || route.code} - {route.routeName || route.name} ({(route.startPoint || route.startLocation)} → {(route.endPoint || route.endLocation)})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search routes..."
+                      value={routeSearchTerm}
+                      onChange={(e) => {
+                        setRouteSearchTerm(e.target.value);
+                        setIsRouteDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsRouteDropdownOpen(true)}
+                      onBlur={(e) => {
+                        // Use a slight delay to allow click events to fire before closing dropdown
+                        setTimeout(() => setIsRouteDropdownOpen(false), 200);
+                      }}
+                      className="pl-12 pr-4 py-3 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    />
+                    
+                    {isRouteDropdownOpen && (
+                      <div className="absolute inset-x-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                        <div 
+                          className={`p-3 cursor-pointer hover:bg-blue-50 ${filterRoute === '' ? 'bg-blue-50' : ''}`}
+                          onMouseDown={(e) => {
+                            e.preventDefault(); // Prevents blur event from firing first
+                            setFilterRoute('');
+                            setRouteSearchTerm('');
+                            setIsRouteDropdownOpen(false);
+                            // Clear route sections
+                            console.log('Clearing route sections - user must select a route');
+                            setRouteSections([]);
+                          }}
+                        >
+                          <span className="font-medium text-gray-700">Select a Route</span>
+                        </div>
+                        
+                        <div 
+                          className={`p-3 cursor-pointer hover:bg-blue-50 ${filterRoute === 'all' ? 'bg-blue-50' : ''}`}
+                          onMouseDown={(e) => {
+                            e.preventDefault(); // Prevents blur event from firing first
+                            setFilterRoute('all');
+                            setRouteSearchTerm('All Routes');
+                            setIsRouteDropdownOpen(false);
+                            // Fetch all route sections
+                            console.log('Fetching all route sections');
+                            fetchAllRouteSections();
+                          }}
+                        >
+                          <span className="font-medium text-gray-700">All Routes</span>
+                        </div>
+
+                        <div className="border-t border-gray-200"></div>
+                        
+                        {filteredRoutes.map((route) => (
+                          <div 
+                            key={route._id}
+                            className={`p-3 cursor-pointer hover:bg-blue-50 ${filterRoute === route._id ? 'bg-blue-50' : ''}`}
+                            onMouseDown={(e) => {
+                              e.preventDefault(); // Prevents blur event from firing first
+                              setFilterRoute(route._id);
+                              setRouteSearchTerm(`${route.routeNumber || route.code || ''} - ${route.routeName || route.name || ''}`);
+                              setIsRouteDropdownOpen(false);
+                              // Fetch sections for specific route
+                              console.log('Fetching sections for specific route:', route._id);
+                              fetchRouteSections(route._id);
+                            }}
+                          >
+                            <div className="font-medium text-gray-800">
+                              {route.routeNumber || route.code} - {route.routeName || route.name}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              ({(route.startPoint || route.startLocation)} → {(route.endPoint || route.endLocation)})
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <button
@@ -628,20 +715,20 @@ function RouteSectionsManager() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div>
                               <div className="text-sm font-medium text-gray-900">
-                                {routeSection.stopId.stopName}
+                                {routeSection.stopId && routeSection.stopId.stopName ? routeSection.stopId.stopName : 'Unknown Stop'}
                               </div>
                               <div className="text-sm text-gray-500">
-                                Section {routeSection.stopId.sectionNumber}
+                                Section {routeSection.stopId && routeSection.stopId.sectionNumber ? routeSection.stopId.sectionNumber : 'N/A'}
                               </div>
                             </div>
                           </td>
                           {(filterRoute === '' || filterRoute === 'all') && (
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">
-                                {routeSection.routeId.routeName}
+                                {routeSection.routeId && routeSection.routeId.routeName ? routeSection.routeId.routeName : 'Unknown Route'}
                               </div>
                               <div className="text-sm text-gray-500">
-                                {routeSection.routeId.routeNumber}
+                                {routeSection.routeId && routeSection.routeId.routeNumber ? routeSection.routeId.routeNumber : 'N/A'}
                               </div>
                             </td>
                           )}
@@ -965,29 +1052,70 @@ function RouteSectionsManager() {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Route
                   </label>
-                  <select
-                    value={formData.routeId}
-                    onChange={async (e) => {
-                      const newRouteId = e.target.value;
-                      setFormData({ ...formData, routeId: newRouteId, stopId: '' }); // Clear stop selection when route changes
-                      
-                      // Fetch stops for the selected route
-                      if (newRouteId) {
-                        await fetchStopsByRoute(newRouteId);
-                      } else {
-                        setFilteredStops([]);
-                      }
-                    }}
-                    required
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
-                  >
-                    <option value="">Select a route</option>
-                    {routes.map((route) => (
-                   <option key={route._id} value={route._id}>
-                        {route.routeNumber || route.code} - {route.routeName || route.name} ({(route.startPoint || route.startLocation)} → {(route.endPoint || route.endLocation)})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search routes..."
+                      value={formData.routeId ? routes.find(r => r._id === formData.routeId) ? 
+                        `${routes.find(r => r._id === formData.routeId)?.routeNumber || routes.find(r => r._id === formData.routeId)?.code || ''} - ${routes.find(r => r._id === formData.routeId)?.routeName || routes.find(r => r._id === formData.routeId)?.name || ''}` 
+                        : '' : formRouteSearchTerm}
+                      onChange={(e) => {
+                        const term = e.target.value;
+                        // Just update the search text, don't change the selection yet
+                        setFormRouteSearchTerm(term);
+                        setIsFormRouteDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsFormRouteDropdownOpen(true)}
+                      onBlur={(e) => {
+                        // Use a slight delay to allow click events to fire before closing dropdown
+                        setTimeout(() => setIsFormRouteDropdownOpen(false), 200);
+                      }}
+                      className="pl-12 pr-4 py-3 w-full rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      required
+                    />
+                    
+                    {isFormRouteDropdownOpen && (
+                      <div className="absolute inset-x-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                        <div className="p-3 text-sm text-gray-500 italic">
+                          Select a route to continue
+                        </div>
+                        
+                        <div className="border-t border-gray-200"></div>
+                        
+                        {filteredRoutes.map((route) => (
+                          <div 
+                            key={route._id}
+                            className={`p-3 cursor-pointer hover:bg-blue-50 ${formData.routeId === route._id ? 'bg-blue-50' : ''}`}
+                            onMouseDown={async (e) => {
+                              e.preventDefault(); // Prevents blur event from firing first
+                              setFormData({ ...formData, routeId: route._id, stopId: '' });
+                              setFormRouteSearchTerm('');
+                              setIsFormRouteDropdownOpen(false);
+                              
+                              // Fetch stops for the selected route
+                              if (route._id) {
+                                await fetchStopsByRoute(route._id);
+                              } else {
+                                setFilteredStops([]);
+                              }
+                            }}
+                          >
+                            <div className="font-medium text-gray-800">
+                              {route.routeNumber || route.code} - {route.routeName || route.name}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              ({(route.startPoint || route.startLocation)} → {(route.endPoint || route.endLocation)})
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -1149,19 +1277,63 @@ function RouteSectionsManager() {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Route *
                   </label>
-                  <select
-                    value={generateFormData.routeId}
-                    onChange={(e) => setGenerateFormData({ ...generateFormData, routeId: e.target.value })}
-                    required
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all bg-white"
-                  >
-                    <option value="">Select a route</option>
-                    {routes.map((route) => (
-                      <option key={route._id} value={route._id}>
-                        {route.routeNumber || route.code} - {route.routeName || route.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search routes..."
+                      value={generateFormData.routeId ? routes.find(r => r._id === generateFormData.routeId) ? 
+                        `${routes.find(r => r._id === generateFormData.routeId)?.routeNumber || routes.find(r => r._id === generateFormData.routeId)?.code || ''} - ${routes.find(r => r._id === generateFormData.routeId)?.routeName || routes.find(r => r._id === generateFormData.routeId)?.name || ''}` 
+                        : '' : generateRouteSearchTerm}
+                      onChange={(e) => {
+                        const term = e.target.value;
+                        // Just update the search text, don't change the selection yet
+                        setGenerateRouteSearchTerm(term);
+                        setIsGenerateRouteDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsGenerateRouteDropdownOpen(true)}
+                      onBlur={(e) => {
+                        // Use a slight delay to allow click events to fire before closing dropdown
+                        setTimeout(() => setIsGenerateRouteDropdownOpen(false), 200);
+                      }}
+                      className="pl-12 pr-4 py-3 w-full rounded-lg border border-gray-200 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                      required
+                    />
+                    
+                    {isGenerateRouteDropdownOpen && (
+                      <div className="absolute inset-x-0 top-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                        <div className="p-3 text-sm text-gray-500 italic">
+                          Select a route to continue
+                        </div>
+                        
+                        <div className="border-t border-gray-200"></div>
+                        
+                        {filteredRoutes.map((route) => (
+                          <div 
+                            key={route._id}
+                            className={`p-3 cursor-pointer hover:bg-blue-50 ${generateFormData.routeId === route._id ? 'bg-blue-50' : ''}`}
+                            onMouseDown={(e) => {
+                              e.preventDefault(); // Prevents blur event from firing first
+                              setGenerateFormData({ ...generateFormData, routeId: route._id });
+                              setGenerateRouteSearchTerm('');
+                              setIsGenerateRouteDropdownOpen(false);
+                            }}
+                          >
+                            <div className="font-medium text-gray-800">
+                              {route.routeNumber || route.code} - {route.routeName || route.name}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              ({(route.startPoint || route.startLocation)} → {(route.endPoint || route.endLocation)})
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -1251,6 +1423,8 @@ function RouteSectionsManager() {
                     fareMultiplier: 1.0, 
                     overwriteExisting: false 
                   });
+                  setGenerateRouteSearchTerm('');
+                  setIsGenerateRouteDropdownOpen(false);
                 }}
                 className="px-6 py-2.5 border-2 border-gray-300 text-gray-700 hover:bg-gray-100 hover:border-gray-400 rounded-lg font-medium transition-all"
               >
