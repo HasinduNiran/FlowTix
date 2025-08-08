@@ -38,6 +38,8 @@ export default function ExpenseTransactionForm({
   const [busSearchTerm, setBusSearchTerm] = useState('');
   const [showBusSuggestions, setShowBusSuggestions] = useState(false);
   const [selectedBusIndex, setSelectedBusIndex] = useState(-1);
+  // Reference to track if we're currently processing a bus selection
+  const selectingBusRef = React.useRef(false);
   const [expenseTypesLoading, setExpenseTypesLoading] = useState(false);
   const [busesLoading, setBusesLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -164,6 +166,24 @@ export default function ExpenseTransactionForm({
     setBusSearchTerm(bus.busNumber);
     setShowBusSuggestions(false);
     setSelectedBusIndex(-1);
+    
+    // Set focus on the next form element (expense type dropdown)
+    setTimeout(() => {
+      // Force update of filteredExpenseTypes based on the selected bus
+      const filtered = availableExpenseTypes.filter(expenseType => {
+        const busId = typeof expenseType.busId === 'string' 
+          ? expenseType.busId 
+          : expenseType.busId?._id;
+        return busId === bus._id;
+      });
+      setFilteredExpenseTypes(filtered);
+      
+      // Move focus to the expense type dropdown
+      const expenseTypeSelect = document.querySelector('select[name="expenseTypeId"]') as HTMLSelectElement;
+      if (expenseTypeSelect) {
+        expenseTypeSelect.focus();
+      }
+    }, 100);
   };
 
   // Handle bus keyboard navigation
@@ -184,7 +204,19 @@ export default function ExpenseTransactionForm({
       case 'Enter':
         e.preventDefault();
         if (selectedBusIndex >= 0) {
+          // Set selecting flag to prevent hiding suggestions during selection
+          selectingBusRef.current = true;
           handleBusSelect(filteredBuses[selectedBusIndex]);
+          setTimeout(() => {
+            selectingBusRef.current = false;
+          }, 100);
+        } else if (filteredBuses.length === 1) {
+          // If only one option and Enter is pressed, select it
+          selectingBusRef.current = true;
+          handleBusSelect(filteredBuses[0]);
+          setTimeout(() => {
+            selectingBusRef.current = false;
+          }, 100);
         }
         break;
       case 'Escape':
@@ -402,16 +434,29 @@ export default function ExpenseTransactionForm({
                           setBusSearchTerm(e.target.value);
                           setShowBusSuggestions(true);
                           setSelectedBusIndex(-1);
+                          
+                          // If user clears the field, clear the bus selection
+                          if (!e.target.value) {
+                            setSelectedBusId('');
+                          }
                         }}
                         onKeyDown={handleBusKeyDown}
                         onFocus={() => setShowBusSuggestions(true)}
                         onBlur={() => {
-                          // Delay hiding suggestions to allow for click
-                          setTimeout(() => setShowBusSuggestions(false), 200);
+                          // Only hide suggestions if we're not in the middle of selecting a bus
+                          setTimeout(() => {
+                            if (!selectingBusRef.current) {
+                              setShowBusSuggestions(false);
+                            }
+                          }, 150);
                         }}
                         placeholder="Type bus number..."
                         required
-                        className="w-full border-green-300 focus:ring-green-500 focus:border-green-500"
+                        className={`w-full ${
+                          selectedBusId 
+                            ? 'border-green-500 bg-green-50 text-green-900' 
+                            : 'border-green-300'
+                        } focus:ring-green-500 focus:border-green-500`}
                       />
                       
                       {/* Loading indicator for buses */}
@@ -422,7 +467,7 @@ export default function ExpenseTransactionForm({
                       )}
                     </div>
 
-                    {/* Bus suggestions dropdown */}
+                      {/* Bus suggestions dropdown */}
                     {showBusSuggestions && filteredBuses.length > 0 && (
                       <div className="absolute z-50 w-full mt-1 bg-white border border-green-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                         {filteredBuses.map((bus, index) => (
@@ -433,7 +478,14 @@ export default function ExpenseTransactionForm({
                                 ? 'bg-green-50 text-green-800'
                                 : 'hover:bg-gray-50'
                             }`}
-                            onClick={() => handleBusSelect(bus)}
+                            onMouseDown={(e) => {
+                              e.preventDefault(); // Prevent default to avoid losing focus before click
+                              selectingBusRef.current = true;
+                              handleBusSelect(bus);
+                              setTimeout(() => {
+                                selectingBusRef.current = false;
+                              }, 100);
+                            }}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
@@ -457,12 +509,20 @@ export default function ExpenseTransactionForm({
                           </div>
                         ))}
                       </div>
-                    )}
-
-                    {/* No buses found */}
+                    )}                    {/* No buses found */}
                     {showBusSuggestions && busSearchTerm && filteredBuses.length === 0 && !busesLoading && (
                       <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-gray-500">
                         No buses found matching "{busSearchTerm}"
+                      </div>
+                    )}
+                    
+                    {/* Selected bus indicator */}
+                    {selectedBusId && (
+                      <div className="mt-1 text-sm text-green-600 flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Bus selected successfully
                       </div>
                     )}
                   </div>
@@ -478,6 +538,7 @@ export default function ExpenseTransactionForm({
                       </div>
                     ) : (
                       <select
+                        name="expenseTypeId"
                         value={formData.expenseTypeId}
                         onChange={(e) => setFormData({ ...formData, expenseTypeId: e.target.value })}
                         required

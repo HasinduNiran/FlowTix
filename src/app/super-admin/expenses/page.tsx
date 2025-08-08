@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ExpenseTypeService, ExpenseTransactionService, ExpenseType, ExpenseTransaction } from '@/services/expense.service';
 import { BusService, Bus } from '@/services/bus.service';
@@ -23,6 +23,7 @@ export default function ExpensesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBus, setSelectedBus] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const selectingBusRef = useRef<boolean>(false);
   
   // Confirmation Modal states
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -196,10 +197,16 @@ export default function ExpensesPage() {
 
   // Bus handling functions
   const handleBusSelect = (bus: Bus) => {
+    console.log('Bus selected:', bus);
     setSelectedBusId(bus._id);
     setBusSearchTerm(bus.busNumber);
     setShowBusSuggestions(false);
     setSelectedBusIndex(-1);
+    
+    // Add a small delay to ensure the state updates
+    setTimeout(() => {
+      selectingBusRef.current = false;
+    }, 100);
   };
 
   const handleBusKeyDown = (e: React.KeyboardEvent) => {
@@ -219,7 +226,13 @@ export default function ExpensesPage() {
       case 'Enter':
         e.preventDefault();
         if (selectedBusIndex >= 0) {
+          // Set selecting flag to prevent hiding suggestions during selection
+          selectingBusRef.current = true;
           handleBusSelect(filteredBuses[selectedBusIndex]);
+        } else if (filteredBuses.length === 1) {
+          // If only one option and Enter is pressed, select it
+          selectingBusRef.current = true;
+          handleBusSelect(filteredBuses[0]);
         }
         break;
       case 'Escape':
@@ -406,11 +419,20 @@ export default function ExpensesPage() {
                         setBusSearchTerm(e.target.value);
                         setShowBusSuggestions(true);
                         setSelectedBusIndex(-1);
+                        
+                        // If user clears the field, clear the bus selection
+                        if (!e.target.value) {
+                          setSelectedBusId('');
+                        }
                       }}
                       onKeyDown={handleBusKeyDown}
                       onFocus={() => setShowBusSuggestions(true)}
                       onBlur={() => {
-                        setTimeout(() => setShowBusSuggestions(false), 200);
+                        setTimeout(() => {
+                          if (!selectingBusRef.current) {
+                            setShowBusSuggestions(false);
+                          }
+                        }, 200);
                       }}
                       placeholder="Type bus number..."
                       className="w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
@@ -427,7 +449,11 @@ export default function ExpensesPage() {
                                 ? 'bg-purple-50 text-purple-800'
                                 : 'hover:bg-gray-50'
                             }`}
-                            onClick={() => handleBusSelect(bus)}
+                            onMouseDown={(e) => {
+                              e.preventDefault(); // Prevent default to avoid losing focus
+                              selectingBusRef.current = true;
+                              handleBusSelect(bus);
+                            }}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
@@ -616,11 +642,20 @@ export default function ExpensesPage() {
                         setBusSearchTerm(e.target.value);
                         setShowBusSuggestions(true);
                         setSelectedBusIndex(-1);
+                        
+                        // If user clears the field, clear the bus selection
+                        if (!e.target.value) {
+                          setSelectedBusId('');
+                        }
                       }}
                       onKeyDown={handleBusKeyDown}
                       onFocus={() => setShowBusSuggestions(true)}
                       onBlur={() => {
-                        setTimeout(() => setShowBusSuggestions(false), 200);
+                        setTimeout(() => {
+                          if (!selectingBusRef.current) {
+                            setShowBusSuggestions(false);
+                          }
+                        }, 200);
                       }}
                       placeholder="Filter by bus number..."
                       className="w-48 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
@@ -637,7 +672,11 @@ export default function ExpensesPage() {
                                 ? 'bg-purple-50 text-purple-800'
                                 : 'hover:bg-gray-50'
                             }`}
-                            onClick={() => handleBusSelect(bus)}
+                            onMouseDown={(e) => {
+                              e.preventDefault(); // Prevent default to avoid losing focus
+                              selectingBusRef.current = true;
+                              handleBusSelect(bus);
+                            }}
                           >
                             <div className="font-medium text-gray-900">{bus.busNumber}</div>
                             <div className="text-sm text-gray-500">{bus.busName}</div>
@@ -766,11 +805,20 @@ export default function ExpensesPage() {
                         setBusSearchTerm(e.target.value);
                         setShowBusSuggestions(true);
                         setSelectedBusIndex(-1);
+                        
+                        // If user clears the field, clear the bus selection
+                        if (!e.target.value) {
+                          setSelectedBusId('');
+                        }
                       }}
                       onKeyDown={handleBusKeyDown}
                       onFocus={() => setShowBusSuggestions(true)}
                       onBlur={() => {
-                        setTimeout(() => setShowBusSuggestions(false), 200);
+                        setTimeout(() => {
+                          if (!selectingBusRef.current) {
+                            setShowBusSuggestions(false);
+                          }
+                        }, 200);
                       }}
                       placeholder="Filter by bus number..."
                       className="w-48 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
@@ -787,7 +835,11 @@ export default function ExpensesPage() {
                                 ? 'bg-purple-50 text-purple-800'
                                 : 'hover:bg-gray-50'
                             }`}
-                            onClick={() => handleBusSelect(bus)}
+                            onMouseDown={(e) => {
+                              e.preventDefault(); // Prevent default to avoid losing focus
+                              selectingBusRef.current = true;
+                              handleBusSelect(bus);
+                            }}
                           >
                             <div className="font-medium text-gray-900">{bus.busNumber}</div>
                             <div className="text-sm text-gray-500">{bus.busName}</div>
