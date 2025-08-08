@@ -18,6 +18,13 @@ export default function RouteSectionsPage() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
+  
+  // Pagination state
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    totalPages: 0
+  });
 
   // Categories available for route sections (kept for reference but not used in editing)
 
@@ -67,6 +74,45 @@ export default function RouteSectionsPage() {
   const filteredRouteSections = selectedRoute 
     ? routeSections.filter(section => section.routeId._id === selectedRoute)
     : routeSections;
+    
+  // Calculate pagination values
+  const totalFiltered = filteredRouteSections.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / pagination.limit));
+  
+  // Update totalPages when filtered sections change
+  useEffect(() => {
+    setPagination(prev => ({
+      ...prev,
+      totalPages: totalPages
+    }));
+  }, [totalFiltered, pagination.limit]);
+  
+  // Handle page changes
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= pagination.totalPages) {
+      setPagination(prev => ({
+        ...prev,
+        page: newPage
+      }));
+    }
+  };
+  
+  // Handle items per page changes
+  const handleLimitChange = (newLimit: number) => {
+    setPagination(prev => ({
+      ...prev,
+      limit: newLimit,
+      page: 1, // Reset to first page when changing limit
+      totalPages: Math.max(1, Math.ceil(totalFiltered / newLimit))
+    }));
+  };
+  
+  // Get current page items
+  const startIndex = (pagination.page - 1) * pagination.limit;
+  const endIndex = Math.min(startIndex + pagination.limit, totalFiltered);
+  const paginatedRouteSections = pagination.limit === 9999 
+    ? filteredRouteSections 
+    : filteredRouteSections.slice(startIndex, endIndex);
 
   // Only show the page if user is a bus owner
   if (user && user.role !== 'bus-owner') {
@@ -251,7 +297,7 @@ export default function RouteSectionsPage() {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {filteredRouteSections.map((section) => (
+                          {paginatedRouteSections.map((section) => (
                             <tr key={section._id} className="hover:bg-gray-50 transition-colors">
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div>
@@ -312,7 +358,7 @@ export default function RouteSectionsPage() {
                       {/* Desktop Cards */}
                       {viewMode === 'card' && (
                         <div className="hidden lg:grid lg:grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-6 p-6">
-                          {filteredRouteSections.map((section) => (
+                          {paginatedRouteSections.map((section) => (
                             <div key={section._id} className="bg-gradient-to-br from-white to-gray-50 rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-all duration-200 hover:border-blue-300">
                               <div className="flex items-start justify-between mb-4">
                                 <div className="flex items-center space-x-3">
@@ -372,7 +418,7 @@ export default function RouteSectionsPage() {
 
                       {/* Mobile Cards */}
                       <div className={`${viewMode === 'card' ? 'lg:hidden' : ''} divide-y divide-gray-200`}>
-                        {filteredRouteSections.map((section) => (
+                        {paginatedRouteSections.map((section) => (
                           <div key={section._id} className="p-4 sm:p-6 hover:bg-gray-50 transition-colors">
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex items-center space-x-3">
@@ -432,6 +478,127 @@ export default function RouteSectionsPage() {
                   )}
                 </>
               )}
+            </div>
+          )}
+          
+          {/* Pagination Controls */}
+          {filteredRouteSections.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 mt-4 sm:mt-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                {/* Results info */}
+                <div className="flex items-center gap-4">
+                  <p className="text-sm text-gray-700">
+                    Showing {startIndex + 1} to {Math.min(endIndex, totalFiltered)} of {totalFiltered} results
+                  </p>
+                  
+                  {/* Items per page selector */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm text-gray-700">Show:</label>
+                    <select
+                      value={pagination.limit}
+                      onChange={(e) => handleLimitChange(Number(e.target.value))}
+                      className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={15}>15</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value={9999}>All</option>
+                    </select>
+                    <span className="text-sm text-gray-700">per page</span>
+                  </div>
+                </div>
+
+                {/* Pagination buttons */}
+                {pagination.totalPages > 1 && pagination.limit !== 9999 && (
+                  <div className="flex items-center space-x-2">
+                    {/* Previous button */}
+                    <button
+                      onClick={() => handlePageChange(pagination.page - 1)}
+                      disabled={pagination.page === 1}
+                      className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+
+                    {/* Page numbers */}
+                    <div className="flex items-center space-x-1">
+                      {/* First page */}
+                      {pagination.page > 3 && (
+                        <>
+                          <button
+                            onClick={() => handlePageChange(1)}
+                            className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                          >
+                            1
+                          </button>
+                          {pagination.page > 4 && (
+                            <span className="px-2 py-2 text-sm text-gray-500">...</span>
+                          )}
+                        </>
+                      )}
+
+                      {/* Current page and surrounding pages */}
+                      {pagination.totalPages > 0 && Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                        // Calculate the correct starting page
+                        let startPage = 1;
+                        if (pagination.page > 2) {
+                          if (pagination.page > pagination.totalPages - 2) {
+                            // Near the end, show last 5 pages or fewer
+                            startPage = Math.max(1, pagination.totalPages - 4);
+                          } else {
+                            // In the middle, center around current page
+                            startPage = pagination.page - 2;
+                          }
+                        }
+                        
+                        const page = startPage + i;
+                        if (page > pagination.totalPages) return null;
+                        
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => handlePageChange(page)}
+                            className={`px-3 py-2 text-sm font-medium rounded-md ${
+                              page === pagination.page
+                                ? 'bg-blue-600 text-white border border-blue-600'
+                                : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      })}
+
+                      {/* Last page */}
+                      {pagination.page < pagination.totalPages - 2 && (
+                        <>
+                          {pagination.page < pagination.totalPages - 3 && (
+                            <span className="px-2 py-2 text-sm text-gray-500">...</span>
+                          )}
+                          <button
+                            onClick={() => handlePageChange(pagination.totalPages)}
+                            className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                          >
+                            {pagination.totalPages}
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Next button */}
+                    <button
+                      onClick={() => handlePageChange(pagination.page + 1)}
+                      disabled={pagination.page === pagination.totalPages}
+                      className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

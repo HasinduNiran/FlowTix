@@ -7,6 +7,7 @@ import { BusService } from '@/services/bus.service';
 import { DataTable } from '@/components/dashboard/DataTable';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Toast } from '@/components/ui/Toast';
 
 export default function DayEndPage() {
   const router = useRouter();
@@ -18,6 +19,30 @@ export default function DayEndPage() {
   const [startDateFilter, setStartDateFilter] = useState<string>(new Date().toISOString().split('T')[0]);
   const [endDateFilter, setEndDateFilter] = useState<string>(new Date().toISOString().split('T')[0]);
   const [buses, setBuses] = useState<any[]>([]);
+  const [toast, setToast] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info' as 'success' | 'error' | 'warning' | 'info'
+  });
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    id: string | null;
+    name: string | null;
+  }>({
+    isOpen: false,
+    id: null,
+    name: null
+  });
+  const [statusConfirmation, setStatusConfirmation] = useState<{
+    isOpen: boolean;
+    id: string | null;
+    status: 'approved' | 'rejected' | null;
+  }>({
+    isOpen: false,
+    id: null,
+    status: null
+  });
 
   // Fetch initial data on component mount
   useEffect(() => {
@@ -57,25 +82,68 @@ export default function DayEndPage() {
     }
   };
 
+  const showToast = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => {
+    setToast({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
+  const confirmDelete = (dayEndId: string) => {
+    const dayEnd = dayEndRecords.find(record => record._id === dayEndId);
+    const busNumber = getBusNumber(dayEnd?.busId || '');
+    const dateStr = dayEnd ? formatDate(dayEnd.date) : '';
+    
+    setDeleteConfirmation({
+      isOpen: true,
+      id: dayEndId,
+      name: `Day End for ${busNumber} on ${dateStr}`
+    });
+  };
+
   const handleDeleteDayEnd = async (dayEndId: string) => {
-    if (window.confirm('Are you sure you want to delete this day end record?')) {
-      try {
-        await DayEndService.deleteDayEnd(dayEndId);
-        fetchDayEndRecords(); // Refresh the list
-      } catch (err: any) {
-        alert(err.message || 'Failed to delete day end record');
-      }
+    try {
+      await DayEndService.deleteDayEnd(dayEndId);
+      fetchDayEndRecords(); // Refresh the list
+      showToast('Success', 'Day end record has been deleted successfully', 'success');
+    } catch (err: any) {
+      showToast('Error', err.message || 'Failed to delete day end record', 'error');
+    } finally {
+      setDeleteConfirmation({
+        isOpen: false,
+        id: null,
+        name: null
+      });
     }
   };
 
+  const confirmStatusUpdate = (dayEndId: string, newStatus: 'approved' | 'rejected') => {
+    setStatusConfirmation({
+      isOpen: true,
+      id: dayEndId,
+      status: newStatus
+    });
+  };
+
   const handleStatusUpdate = async (dayEndId: string, newStatus: 'approved' | 'rejected') => {
-    if (window.confirm(`Are you sure you want to ${newStatus} this day end record?`)) {
-      try {
-        await DayEndService.updateDayEndStatus(dayEndId, newStatus);
-        fetchDayEndRecords(); // Refresh the list
-      } catch (err: any) {
-        alert(err.message || `Failed to ${newStatus} day end record`);
-      }
+    try {
+      await DayEndService.updateDayEndStatus(dayEndId, newStatus);
+      fetchDayEndRecords(); // Refresh the list
+      showToast(
+        'Status Updated', 
+        `Day end record has been ${newStatus} successfully`, 
+        newStatus === 'approved' ? 'success' : 'warning'
+      );
+    } catch (err: any) {
+      showToast('Error', err.message || `Failed to ${newStatus} day end record`, 'error');
+    } finally {
+      setStatusConfirmation({
+        isOpen: false,
+        id: null,
+        status: null
+      });
     }
   };
 
@@ -204,7 +272,7 @@ export default function DayEndPage() {
           {row?.status === 'pending' && (
             <>
               <button
-                onClick={() => handleStatusUpdate(id, 'approved')}
+                onClick={() => confirmStatusUpdate(id, 'approved')}
                 className="p-2 bg-green-50 text-green-600 rounded-full hover:bg-green-100 transition-colors"
                 title="Approve Day End"
               >
@@ -213,7 +281,7 @@ export default function DayEndPage() {
                 </svg>
               </button>
               <button
-                onClick={() => handleStatusUpdate(id, 'rejected')}
+                onClick={() => confirmStatusUpdate(id, 'rejected')}
                 className="p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors"
                 title="Reject Day End"
               >
@@ -234,7 +302,7 @@ export default function DayEndPage() {
             </svg>
           </button>
           <button
-            onClick={() => handleDeleteDayEnd(id)}
+            onClick={() => confirmDelete(id)}
             className="p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors"
             title="Delete Day End"
           >
@@ -249,6 +317,95 @@ export default function DayEndPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
+      <Toast 
+        isOpen={toast.isOpen}
+        onClose={() => setToast(prev => ({ ...prev, isOpen: false }))}
+        title={toast.title}
+        message={toast.message}
+        type={toast.type}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmation.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 transform transition-all duration-300 ease-out scale-100">
+            <div className="flex items-center mb-4">
+              <div className="bg-red-100 p-2 rounded-full">
+                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h3 className="ml-3 text-lg font-semibold text-gray-900">Confirm Delete</h3>
+            </div>
+            
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete <span className="font-semibold">{deleteConfirmation.name}</span>? This action cannot be undone.
+            </p>
+            
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setDeleteConfirmation({ isOpen: false, id: null, name: null })}
+                className="px-4 py-2 border-gray-300 text-gray-700"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => deleteConfirmation.id && handleDeleteDayEnd(deleteConfirmation.id)}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white"
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Status Update Confirmation Dialog */}
+      {statusConfirmation.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 transform transition-all duration-300 ease-out scale-100">
+            <div className="flex items-center mb-4">
+              <div className={`p-2 rounded-full ${statusConfirmation.status === 'approved' ? 'bg-green-100' : 'bg-red-100'}`}>
+                <svg className={`h-6 w-6 ${statusConfirmation.status === 'approved' ? 'text-green-600' : 'text-red-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" 
+                    d={statusConfirmation.status === 'approved' 
+                      ? "M5 13l4 4L19 7" 
+                      : "M6 18L18 6M6 6l12 12"} />
+                </svg>
+              </div>
+              <h3 className="ml-3 text-lg font-semibold text-gray-900">
+                Confirm {statusConfirmation.status === 'approved' ? 'Approval' : 'Rejection'}
+              </h3>
+            </div>
+            
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to {statusConfirmation.status} this day end record?
+            </p>
+            
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setStatusConfirmation({ isOpen: false, id: null, status: null })}
+                className="px-4 py-2 border-gray-300 text-gray-700"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => statusConfirmation.id && statusConfirmation.status && handleStatusUpdate(statusConfirmation.id, statusConfirmation.status)}
+                className={`px-4 py-2 ${
+                  statusConfirmation.status === 'approved' 
+                    ? 'bg-green-600 hover:bg-green-700' 
+                    : 'bg-red-600 hover:bg-red-700'
+                } text-white`}
+              >
+                {statusConfirmation.status === 'approved' ? 'Approve' : 'Reject'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="container mx-auto p-6 max-w-7xl">
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
           {/* Header Section */}

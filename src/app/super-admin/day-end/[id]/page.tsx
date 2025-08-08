@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { DayEndService, DayEnd } from '@/services/dayEnd.service';
 import { BusService } from '@/services/bus.service';
 import { Button } from '@/components/ui/Button';
+import { Toast } from '@/components/ui/Toast';
 
 export default function DayEndDetailPage() {
   const router = useRouter();
@@ -15,6 +16,19 @@ export default function DayEndDetailPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [buses, setBuses] = useState<any[]>([]);
+  const [toast, setToast] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info' as 'success' | 'error' | 'warning' | 'info'
+  });
+  const [statusConfirmation, setStatusConfirmation] = useState<{
+    isOpen: boolean;
+    status: 'approved' | 'rejected' | null;
+  }>({
+    isOpen: false,
+    status: null
+  });
 
   useEffect(() => {
     if (dayEndId) {
@@ -46,16 +60,40 @@ export default function DayEndDetailPage() {
     }
   };
 
+  const showToast = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => {
+    setToast({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
+  const confirmStatusUpdate = (newStatus: 'approved' | 'rejected') => {
+    setStatusConfirmation({
+      isOpen: true,
+      status: newStatus
+    });
+  };
+
   const handleStatusUpdate = async (newStatus: 'approved' | 'rejected') => {
     if (!dayEnd) return;
     
-    if (window.confirm(`Are you sure you want to ${newStatus} this day end record?`)) {
-      try {
-        await DayEndService.updateDayEndStatus(dayEnd._id, newStatus);
-        fetchDayEnd(); // Refresh the data
-      } catch (err: any) {
-        alert(err.message || `Failed to ${newStatus} day end record`);
-      }
+    try {
+      await DayEndService.updateDayEndStatus(dayEnd._id, newStatus);
+      fetchDayEnd(); // Refresh the data
+      showToast(
+        'Status Updated', 
+        `Day end record has been ${newStatus} successfully`, 
+        newStatus === 'approved' ? 'success' : 'warning'
+      );
+    } catch (err: any) {
+      showToast('Error', err.message || `Failed to ${newStatus} day end record`, 'error');
+    } finally {
+      setStatusConfirmation({
+        isOpen: false,
+        status: null
+      });
     }
   };
 
@@ -116,6 +154,59 @@ export default function DayEndDetailPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
+      <Toast 
+        isOpen={toast.isOpen}
+        onClose={() => setToast(prev => ({ ...prev, isOpen: false }))}
+        title={toast.title}
+        message={toast.message}
+        type={toast.type}
+      />
+
+      {/* Status Update Confirmation Dialog */}
+      {statusConfirmation.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 transform transition-all duration-300 ease-out scale-100">
+            <div className="flex items-center mb-4">
+              <div className={`p-2 rounded-full ${statusConfirmation.status === 'approved' ? 'bg-green-100' : 'bg-red-100'}`}>
+                <svg className={`h-6 w-6 ${statusConfirmation.status === 'approved' ? 'text-green-600' : 'text-red-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" 
+                    d={statusConfirmation.status === 'approved' 
+                      ? "M5 13l4 4L19 7" 
+                      : "M6 18L18 6M6 6l12 12"} />
+                </svg>
+              </div>
+              <h3 className="ml-3 text-lg font-semibold text-gray-900">
+                Confirm {statusConfirmation.status === 'approved' ? 'Approval' : 'Rejection'}
+              </h3>
+            </div>
+            
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to {statusConfirmation.status} this day end record?
+            </p>
+            
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setStatusConfirmation({ isOpen: false, status: null })}
+                className="px-4 py-2 border-gray-300 text-gray-700"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => statusConfirmation.status && handleStatusUpdate(statusConfirmation.status)}
+                className={`px-4 py-2 ${
+                  statusConfirmation.status === 'approved' 
+                    ? 'bg-green-600 hover:bg-green-700' 
+                    : 'bg-red-600 hover:bg-red-700'
+                } text-white`}
+              >
+                {statusConfirmation.status === 'approved' ? 'Approve' : 'Reject'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="container mx-auto p-6 max-w-6xl">
         {/* Header */}
         <div className="mb-6">
@@ -200,13 +291,13 @@ export default function DayEndDetailPage() {
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">Actions</h2>
                 <div className="space-y-3">
                   <Button
-                    onClick={() => handleStatusUpdate('approved')}
+                    onClick={() => confirmStatusUpdate('approved')}
                     className="w-full bg-green-600 hover:bg-green-700"
                   >
                     Approve Day End
                   </Button>
                   <Button
-                    onClick={() => handleStatusUpdate('rejected')}
+                    onClick={() => confirmStatusUpdate('rejected')}
                     variant="outline"
                     className="w-full border-red-600 text-red-600 hover:bg-red-50"
                   >

@@ -6,6 +6,7 @@ import { TicketService, Ticket } from '@/services/ticket.service';
 import { RouteService } from '@/services/route.service';
 import { BusService } from '@/services/bus.service';
 import { Button } from '@/components/ui/Button';
+import { Toast } from '@/components/ui/Toast';
 
 export default function TicketDetailsPage() {
   const params = useParams();
@@ -17,6 +18,17 @@ export default function TicketDetailsPage() {
   const [bus, setBus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info' as 'success' | 'error' | 'warning' | 'info'
+  });
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+  }>({
+    isOpen: false
+  });
 
   useEffect(() => {
     if (ticketId) {
@@ -32,13 +44,19 @@ export default function TicketDetailsPage() {
       
       // Fetch route details
       if (ticketData.routeId) {
-        const routeData = await RouteService.getRouteById(ticketData.routeId);
+        const routeId = typeof ticketData.routeId === 'string' 
+          ? ticketData.routeId 
+          : ticketData.routeId._id;
+        const routeData = await RouteService.getRouteById(routeId);
         setRoute(routeData);
       }
       
       // Fetch bus details
       if (ticketData.busId) {
-        const busData = await BusService.getBusById(ticketData.busId);
+        const busId = typeof ticketData.busId === 'string'
+          ? ticketData.busId
+          : ticketData.busId._id;
+        const busData = await BusService.getBusById(busId);
         setBus(busData);
       }
       
@@ -69,15 +87,34 @@ export default function TicketDetailsPage() {
     }
   };
 
+  const showToast = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => {
+    setToast({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
+  const confirmDeleteTicket = () => {
+    setDeleteConfirmation({
+      isOpen: true
+    });
+  };
+
   const handleDeleteTicket = async () => {
-    if (window.confirm('Are you sure you want to delete this ticket?')) {
-      try {
-        await TicketService.deleteTicket(ticketId);
-        alert('Ticket deleted successfully');
+    try {
+      await TicketService.deleteTicket(ticketId);
+      showToast('Success', 'Ticket deleted successfully', 'success');
+      // Set a small delay before redirecting to show the toast
+      setTimeout(() => {
         router.push('/super-admin/tickets');
-      } catch (err: any) {
-        alert(err.message || 'Failed to delete ticket');
-      }
+      }, 1500);
+    } catch (err: any) {
+      showToast('Error', err.message || 'Failed to delete ticket', 'error');
+      setDeleteConfirmation({
+        isOpen: false
+      });
     }
   };
 
@@ -126,6 +163,50 @@ export default function TicketDetailsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
+      <Toast 
+        isOpen={toast.isOpen}
+        onClose={() => setToast(prev => ({ ...prev, isOpen: false }))}
+        title={toast.title}
+        message={toast.message}
+        type={toast.type}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmation.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 transform transition-all duration-300 ease-out scale-100">
+            <div className="flex items-center mb-4">
+              <div className="bg-red-100 p-2 rounded-full">
+                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h3 className="ml-3 text-lg font-semibold text-gray-900">Confirm Delete</h3>
+            </div>
+            
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete this ticket? This action cannot be undone.
+            </p>
+            
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setDeleteConfirmation({ isOpen: false })}
+                className="px-4 py-2 border-gray-300 text-gray-700"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDeleteTicket}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white"
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="container mx-auto p-6 max-w-7xl">
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
           {/* Header Section */}
@@ -316,7 +397,7 @@ export default function TicketDetailsPage() {
                     <span>Print Ticket</span>
                   </Button>
                   <Button
-                    onClick={handleDeleteTicket}
+                    onClick={confirmDeleteTicket}
                     variant="outline"
                     className="text-red-600 border-red-300 hover:bg-red-50 flex items-center space-x-2"
                   >

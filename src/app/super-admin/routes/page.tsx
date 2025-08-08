@@ -6,6 +6,7 @@ import { RouteService, Route } from '@/services/route.service';
 import { DataTable } from '@/components/dashboard/DataTable';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Toast } from '@/components/ui/Toast';
 
 export default function RoutesPage() {
   const router = useRouter();
@@ -14,6 +15,21 @@ export default function RoutesPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
+  const [toast, setToast] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info' as 'success' | 'error' | 'warning' | 'info'
+  });
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean,
+    routeId: string | null,
+    routeName: string | null
+  }>({
+    isOpen: false,
+    routeId: null,
+    routeName: null
+  });
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -115,6 +131,15 @@ export default function RoutesPage() {
     }
   };
 
+  const showToast = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => {
+    setToast({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
   const handleAddRoute = async () => {
     try {
       await RouteService.createRoute({
@@ -140,23 +165,38 @@ export default function RoutesPage() {
       // Refresh data
       fetchRoutesWithPagination();
       fetchTotalCounts();
-    } catch (err) {
+      showToast('Route Created', 'New route has been successfully created.', 'success');
+    } catch (err: any) {
       console.error('Failed to add route:', err);
-      setError('Failed to add route. Please try again.');
+      showToast('Failed to Add Route', err.message || 'An error occurred while creating the route.', 'error');
     }
   };
 
+  const confirmDelete = (id: string) => {
+    const routeToDelete = routes.find(route => route._id === id);
+    setDeleteConfirmation({
+      isOpen: true,
+      routeId: id,
+      routeName: routeToDelete?.name || 'this route'
+    });
+  };
+
   const handleDeleteRoute = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this route?')) {
-      try {
-        await RouteService.deleteRoute(id);
-        // Refresh data
-        fetchRoutesWithPagination();
-        fetchTotalCounts();
-      } catch (err) {
-        console.error('Failed to delete route:', err);
-        setError('Failed to delete route. Please try again.');
-      }
+    try {
+      await RouteService.deleteRoute(id);
+      // Refresh data
+      fetchRoutesWithPagination();
+      fetchTotalCounts();
+      showToast('Route Deleted', 'The route has been successfully deleted.', 'success');
+    } catch (err: any) {
+      console.error('Failed to delete route:', err);
+      showToast('Failed to Delete Route', err.message || 'An error occurred while deleting the route.', 'error');
+    } finally {
+      setDeleteConfirmation({
+        isOpen: false,
+        routeId: null,
+        routeName: null
+      });
     }
   };
 
@@ -216,7 +256,7 @@ export default function RoutesPage() {
             </svg>
           </button>
           <button
-            onClick={() => handleDeleteRoute(route?._id || value)}
+            onClick={() => confirmDelete(route?._id || value)}
             className="p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors"
             title="Delete Route"
           >
@@ -240,6 +280,13 @@ export default function RoutesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
+      <Toast 
+        isOpen={toast.isOpen}
+        onClose={() => setToast(prev => ({ ...prev, isOpen: false }))}
+        title={toast.title}
+        message={toast.message}
+        type={toast.type}
+      />
       <div className="container mx-auto p-6 max-w-7xl">
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
           {/* Header Section */}
@@ -411,6 +458,46 @@ export default function RoutesPage() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Toast */}
+      {deleteConfirmation.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.3)' }}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 transform transition-all duration-300 ease-out scale-100">
+            <div className="flex items-center mb-4">
+              <div className="bg-red-100 p-2 rounded-full">
+                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h3 className="ml-3 text-lg font-semibold text-gray-900">Confirm Delete</h3>
+            </div>
+            
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete <span className="font-semibold">{deleteConfirmation.routeName}</span>? This action cannot be undone.
+            </p>
+            
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setDeleteConfirmation({
+                  isOpen: false,
+                  routeId: null,
+                  routeName: null
+                })}
+                className="px-4 py-2 border-gray-300 text-gray-700"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => deleteConfirmation.routeId && handleDeleteRoute(deleteConfirmation.routeId)}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white"
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Route Modal */}
       {showAddModal && (

@@ -6,7 +6,28 @@ import { RouteService, type Route } from '@/services/route.service';
 import { StopService, type Stop } from '@/services/stop.service';
 import { Toast } from '@/components/ui/Toast';
 
-  // RouteSectionsManager component
+interface ToastState {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+}
+
+interface GenerateFormData {
+  routeId: string;
+  category: string;
+  fareMultiplier: number;
+  overwriteExisting: boolean;
+}
+
+interface PaginationState {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+// RouteSectionsManager component
 function RouteSectionsManager() {
   const [routeSections, setRouteSections] = useState<RouteSection[]>([]);
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -21,11 +42,41 @@ function RouteSectionsManager() {
   const [isGenerateRouteDropdownOpen, setIsGenerateRouteDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [selectedRouteSection, setSelectedRouteSection] = useState<RouteSection | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRoute, setFilterRoute] = useState('');
   const [sortBy, setSortBy] = useState<'route' | 'order' | 'fare' | 'createdAt'>('order');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [toast, setToast] = useState<ToastState>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
+  // State for delete confirmation
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    id: string;
+    title: string;
+  }>({
+    isOpen: false,
+    id: '',
+    title: ''
+  });
+  const [generateFormData, setGenerateFormData] = useState<GenerateFormData>({
+    routeId: '',
+    category: 'normal',
+    fareMultiplier: 1.0,
+    overwriteExisting: false
+  });
+  const [pagination, setPagination] = useState<PaginationState>({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1
+  });
 
   // Form state
   const [formData, setFormData] = useState({
@@ -71,7 +122,12 @@ function RouteSectionsManager() {
   
   // Filter routes based on search term for main dropdown
   useEffect(() => {
-    setFilteredRoutes(filterRoutesByTerm(routeSearchTerm));
+    // Don't filter if the term exactly matches our placeholder texts
+    if (routeSearchTerm === 'All Routes' || routeSearchTerm === 'Select a Route') {
+      setFilteredRoutes(routes);
+    } else {
+      setFilteredRoutes(filterRoutesByTerm(routeSearchTerm));
+    }
   }, [routeSearchTerm, routes]);
   
   // Filter routes based on search term for form dropdowns
@@ -88,6 +144,23 @@ function RouteSectionsManager() {
     console.log('Current filterRoute:', filterRoute);
     console.log('Total routeSections:', routeSections.length);
   }, [filterRoute, routeSections]);
+  
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (isRouteDropdownOpen) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('.route-dropdown-container')) {
+          setIsRouteDropdownOpen(false);
+        }
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isRouteDropdownOpen]);
 
   const fetchInitialData = async () => {
     try {
@@ -111,6 +184,7 @@ function RouteSectionsManager() {
       setStops(stopsData);
       setRouteSections(routeSectionsData); // Load all route sections initially
       setFilterRoute('all'); // Set default filter to show all routes
+      setRouteSearchTerm('All Routes'); // Initialize the search term to match the filter
     } catch (error) {
       console.error('Error fetching initial data:', error);
       setRoutes([]);
@@ -202,8 +276,8 @@ function RouteSectionsManager() {
   const handleEdit = async (routeSection: RouteSection) => {
     setSelectedRouteSection(routeSection);
     setFormData({
-      routeId: routeSection.routeId._id,
-      stopId: routeSection.stopId._id,
+      routeId: routeSection.routeId?._id || '',
+      stopId: routeSection.stopId?._id || '',
       category: routeSection.category,
       fare: routeSection.fare,
       order: routeSection.order,
@@ -211,14 +285,35 @@ function RouteSectionsManager() {
     });
     
     // Fetch stops for the selected route
-    await fetchStopsByRoute(routeSection.routeId._id);
+    if (routeSection.routeId?._id) {
+      await fetchStopsByRoute(routeSection.routeId?._id);
+    }
     
     setShowModal(true);
   };
 
+  // Show confirmation toast for delete
+  const confirmDelete = (id: string, stopName: string) => {
+    setDeleteConfirmation({
+      isOpen: true,
+      id,
+      title: stopName || 'this route section'
+    });
+    
+    // Show confirmation toast
+    setToast({
+      isOpen: true,
+      title: 'Confirm Delete',
+      message: `Are you sure you want to delete ${stopName || 'this route section'}? Click here to confirm.`,
+      type: 'warning'
+    });
+  };
+
+  // Handle actual delete when confirmed
   const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this route section?')) {
+    if (deleteConfirmation.isOpen && deleteConfirmation.id === id) {
       try {
+        setDeleteConfirmation({ isOpen: false, id: '', title: '' }); // Reset confirmation
         await RouteSectionService.deleteRouteSection(id);
         
         showToast('Success', 'Route section deleted successfully!', 'success');
@@ -234,6 +329,13 @@ function RouteSectionsManager() {
         console.error('Error deleting route section:', error);
         showToast('Error', 'Error deleting route section. Please try again.', 'error');
       }
+    } else {
+      // Get the route section details for confirmation message
+      const sectionToDelete = routeSections.find(section => section._id === id);
+      const stopName = sectionToDelete?.stopId?.stopName;
+      
+      // Show delete confirmation
+      confirmDelete(id, stopName || '');
     }
   };
 
@@ -353,8 +455,8 @@ function RouteSectionsManager() {
       
       switch (sortBy) {
         case 'route':
-          aValue = a.routeId.routeName || '';
-          bValue = b.routeId.routeName || '';
+          aValue = a.routeId?.routeName || '';
+          bValue = b.routeId?.routeName || '';
           break;
         case 'order':
           aValue = a.order;
@@ -382,36 +484,85 @@ function RouteSectionsManager() {
   // Update pagination totals
   const totalFiltered = filteredAndSortedRouteSections.length;
   const effectiveLimit = pagination.limit === 9999 ? totalFiltered : pagination.limit;
-  const totalPages = pagination.limit === 9999 ? 1 : Math.ceil(totalFiltered / pagination.limit);
-  const startIndex = pagination.limit === 9999 ? 0 : (pagination.page - 1) * pagination.limit;
-  const endIndex = pagination.limit === 9999 ? totalFiltered : startIndex + pagination.limit;
-  const paginatedRouteSections = filteredAndSortedRouteSections.slice(startIndex, endIndex);
+  const totalPages = pagination.limit === 9999 ? 1 : Math.max(1, Math.ceil(totalFiltered / pagination.limit));
+  // Ensure page is within valid range (never show a page with no data)
+  const currentPage = Math.min(Math.max(1, pagination.page), Math.max(1, totalPages));
+  const startIndex = pagination.limit === 9999 ? 0 : (currentPage - 1) * pagination.limit;
+  const endIndex = pagination.limit === 9999 ? totalFiltered : Math.min(startIndex + pagination.limit, totalFiltered);
+  
+  // Get paginated sections and ensure we're showing data
+  const paginatedRouteSections = totalFiltered > 0 ? 
+    filteredAndSortedRouteSections.slice(startIndex, endIndex) : 
+    [];
 
-  // Update pagination state when filter changes
+  // Update pagination state when filter changes or data changes
   useEffect(() => {
-    const correctedTotalPages = pagination.limit === 9999 ? 1 : Math.ceil(totalFiltered / pagination.limit);
+    const correctedTotalPages = pagination.limit === 9999 ? 1 : Math.max(1, Math.ceil(totalFiltered / pagination.limit));
     setPagination(prev => ({
       ...prev,
       total: totalFiltered,
       totalPages: correctedTotalPages,
-      page: Math.min(prev.page, Math.max(1, correctedTotalPages)) // Reset to page 1 if current page exceeds total pages
+      page: Math.min(prev.page, Math.max(1, correctedTotalPages)) // Ensure page is within valid range
     }));
-  }, [totalFiltered, pagination.limit]);
+    
+    // Debug pagination variables
+    console.log('Pagination update:', {
+      totalFiltered,
+      currentPage,
+      limit: pagination.limit,
+      totalPages: correctedTotalPages,
+      startIndex,
+      endIndex,
+      itemsOnPage: paginatedRouteSections.length
+    });
+  }, [totalFiltered, pagination.limit, filterRoute, searchTerm, routeSections.length]);
 
   const handlePageChange = (newPage: number) => {
+    // Make sure the new page is within valid range
+    const validPage = Math.min(Math.max(1, newPage), pagination.totalPages);
+    console.log(`Changing page to ${validPage} (requested: ${newPage}, total pages: ${pagination.totalPages})`);
+    
     setPagination(prev => ({
       ...prev,
-      page: newPage
+      page: validPage
     }));
+    
+    // Scroll to top of the table for better UX
+    const tableElement = document.querySelector('.bg-white.rounded-xl.shadow-sm.border');
+    if (tableElement) {
+      tableElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
   const handleLimitChange = (newLimit: number) => {
+    console.log(`Changing limit to ${newLimit} items per page`);
+    
+    // When changing limit, we need to recalculate total pages and reset to page 1
+    const newTotalPages = newLimit === 9999 ? 1 : Math.max(1, Math.ceil(totalFiltered / newLimit));
+    
     setPagination(prev => ({
       ...prev,
       limit: newLimit,
-      page: 1 // Reset to first page when changing limit
+      page: 1, // Reset to first page when changing limit
+      totalPages: newTotalPages
     }));
   };
+  
+  // Reset pagination when search term changes
+  useEffect(() => {
+    setPagination(prev => ({
+      ...prev,
+      page: 1
+    }));
+  }, [searchTerm]);
+  
+  // Reset pagination when filter route changes
+  useEffect(() => {
+    setPagination(prev => ({
+      ...prev,
+      page: 1
+    }));
+  }, [filterRoute]);
 
   if (loading) {
     return (
@@ -474,43 +625,83 @@ function RouteSectionsManager() {
                   />
                 </div>
                 
-                <div className="relative flex-grow lg:w-80">
+                <div className="relative flex-grow lg:w-80 route-dropdown-container">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                    <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
                     </svg>
                   </div>
-                  <select
-                    value={filterRoute}
+                  <input
+                    type="text"
+                    placeholder="Search and select route..."
+                    value={routeSearchTerm}
                     onChange={(e) => {
-                      const selectedRoute = e.target.value;
-                      console.log('Route filter changed to:', selectedRoute);
-                      setFilterRoute(selectedRoute);
-                      
-                      if (selectedRoute === '') {
-                        // "Select a Route" - clear route sections
-                        console.log('Clearing route sections - user must select a route');
-                        setRouteSections([]);
-                      } else if (selectedRoute === 'all') {
-                        // "All Routes" selected - fetch all route sections
-                        console.log('Fetching all route sections');
-                        fetchAllRouteSections();
-                      } else {
-                        // Specific route selected - fetch sections for that route only
-                        console.log('Fetching sections for specific route:', selectedRoute);
-                        fetchRouteSections(selectedRoute);
+                      setRouteSearchTerm(e.target.value);
+                      setIsRouteDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsRouteDropdownOpen(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setIsRouteDropdownOpen(false);
                       }
                     }}
-                    className="pl-12 pr-4 py-3 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white appearance-none"
-                  >
-                    <option value="">Select a Route</option>
-                    <option value="all">All Routes</option>
-                    {routes.map((route) => (
-                      <option key={route._id} value={route._id}>
-                        {route.code} - {route.name} ({route.startLocation} → {route.endLocation})
-                      </option>
-                    ))}
-                  </select>
+                    className="pl-12 pr-4 py-3 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
+                  />
+                  
+                  {isRouteDropdownOpen && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      <div 
+                        className="p-3 cursor-pointer hover:bg-blue-50 border-b border-gray-200"
+                        onClick={() => {
+                          setFilterRoute('');
+                          setRouteSearchTerm('Select a Route');
+                          setIsRouteDropdownOpen(false);
+                          console.log('Clearing route sections - user must select a route');
+                          setRouteSections([]);
+                          // Reset pagination
+                          setPagination(prev => ({ ...prev, page: 1 }));
+                        }}
+                      >
+                        Select a Route
+                      </div>
+                      <div 
+                        className="p-3 cursor-pointer hover:bg-blue-50 border-b border-gray-200"
+                        onClick={() => {
+                          setFilterRoute('all');
+                          setRouteSearchTerm('All Routes');
+                          setIsRouteDropdownOpen(false);
+                          console.log('Fetching all route sections');
+                          fetchAllRouteSections();
+                          // Reset pagination
+                          setPagination(prev => ({ ...prev, page: 1 }));
+                        }}
+                      >
+                        All Routes
+                      </div>
+                      
+                      {filteredRoutes.length === 0 ? (
+                        <div className="p-3 text-gray-500 italic text-center">No matching routes</div>
+                      ) : (
+                        filteredRoutes.map((route) => (
+                          <div 
+                            key={route._id} 
+                            className="p-3 cursor-pointer hover:bg-blue-50 border-b border-gray-200"
+                            onClick={() => {
+                              setFilterRoute(route._id);
+                              setRouteSearchTerm(`${route.code} - ${route.name} (${route.startLocation} → ${route.endLocation})`);
+                              setIsRouteDropdownOpen(false);
+                              console.log('Fetching sections for specific route:', route._id);
+                              fetchRouteSections(route._id);
+                              // Reset pagination
+                              setPagination(prev => ({ ...prev, page: 1 }));
+                            }}
+                          >
+                            {route.code} - {route.name} ({route.startLocation} → {route.endLocation})
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Add Button */}
@@ -639,7 +830,7 @@ function RouteSectionsManager() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredAndSortedRouteSections.map((routeSection) => (
+                      {paginatedRouteSections.map((routeSection) => (
                         <tr key={routeSection._id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
@@ -653,20 +844,20 @@ function RouteSectionsManager() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div>
                               <div className="text-sm font-medium text-gray-900">
-                                {routeSection.stopId.stopName}
+                                {routeSection.stopId?.stopName || "No stop name"}
                               </div>
                               <div className="text-sm text-gray-500">
-                                Section {routeSection.stopId.sectionNumber}
+                                Section {routeSection.stopId?.sectionNumber || "N/A"}
                               </div>
                             </div>
                           </td>
                           {(filterRoute === '' || filterRoute === 'all') && (
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">
-                                {routeSection.routeId.routeName}
+                                {routeSection.routeId?.routeName || "No route name"}
                               </div>
                               <div className="text-sm text-gray-500">
-                                {routeSection.routeId.routeNumber}
+                                {routeSection.routeId?.routeNumber || "No number"}
                               </div>
                             </td>
                           )}
@@ -702,8 +893,8 @@ function RouteSectionsManager() {
                               </button>
                               <button
                                 onClick={() => handleDelete(routeSection._id)}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-colors"
-                                title="Delete Route Section"
+                                className={`p-2 ${deleteConfirmation.id === routeSection._id ? 'text-white bg-red-500 hover:bg-red-600' : 'text-red-600 hover:bg-red-50'} rounded-full transition-colors`}
+                                title={deleteConfirmation.id === routeSection._id ? "Click again to confirm delete" : "Delete Route Section"}
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                                   <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -778,8 +969,20 @@ function RouteSectionsManager() {
                       )}
 
                       {/* Current page and surrounding pages */}
-                      {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                        const page = Math.max(1, Math.min(pagination.totalPages - 4, pagination.page - 2)) + i;
+                      {pagination.totalPages > 0 && Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                        // Calculate the correct starting page
+                        let startPage = 1;
+                        if (pagination.page > 2) {
+                          if (pagination.page > pagination.totalPages - 2) {
+                            // Near the end, show last 5 pages or fewer
+                            startPage = Math.max(1, pagination.totalPages - 4);
+                          } else {
+                            // In the middle, center around current page
+                            startPage = pagination.page - 2;
+                          }
+                        }
+                        
+                        const page = startPage + i;
                         if (page > pagination.totalPages) return null;
                         
                         return (
@@ -1346,14 +1549,28 @@ function RouteSectionsManager() {
       
       {/* Toast Notification */}
       {toast.isOpen && (
-        <Toast
-          isOpen={toast.isOpen}
-          onClose={() => setToast(prev => ({ ...prev, isOpen: false }))}
-          title={toast.title}
-          message={toast.message}
-          type={toast.type}
-          duration={5000}
-        />
+        <div onClick={() => {
+          // For warning toasts, clicking should confirm the delete action
+          if (toast.type === 'warning' && deleteConfirmation.isOpen) {
+            handleDelete(deleteConfirmation.id);
+          }
+        }}>
+          <Toast
+            isOpen={toast.isOpen}
+            onClose={() => {
+              setToast(prev => ({ ...prev, isOpen: false }));
+              // Also reset delete confirmation when toast is closed
+              if (deleteConfirmation.isOpen) {
+                setDeleteConfirmation({ isOpen: false, id: '', title: '' });
+              }
+            }}
+            title={toast.title}
+            message={toast.message}
+            type={toast.type}
+            duration={toast.type === 'warning' ? 10000 : 5000} // Longer duration for confirmations
+            showCloseButton={true}
+          />
+        </div>
       )}
           </div>
         </div>

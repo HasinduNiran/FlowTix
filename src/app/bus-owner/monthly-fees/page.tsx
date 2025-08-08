@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { MonthlyFeeService, MonthlyFee } from '@/services/monthlyFee.service';
 import { BusService, Bus } from '@/services/bus.service';
+import { Toast } from '@/components/ui/Toast';
 
 export default function MonthlyFeesPage() {
   const { user } = useAuth();
@@ -16,6 +17,12 @@ export default function MonthlyFeesPage() {
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
+  const [toast, setToast] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info' as 'success' | 'error' | 'warning' | 'info'
+  });
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -88,9 +95,18 @@ export default function MonthlyFeesPage() {
     fetchMonthlyFees(1);
   }, [user?.id, selectedBus, selectedStatus, selectedMonth]);
 
+  const showToast = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => {
+    setToast({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
   const handleDownloadBill = async (monthlyFee: MonthlyFee) => {
     if (monthlyFee.status !== 'paid') {
-      alert('Bill can only be downloaded for paid fees');
+      showToast('Action Not Allowed', 'Bill can only be downloaded for paid fees', 'warning');
       return;
     }
 
@@ -98,9 +114,10 @@ export default function MonthlyFeesPage() {
       setDownloadingId(monthlyFee._id);
       const busNumber = typeof monthlyFee.busId === 'object' ? monthlyFee.busId.busNumber : 'Unknown';
       await MonthlyFeeService.downloadBill(monthlyFee._id, busNumber, monthlyFee.month);
+      showToast('Download Successful', 'The bill has been downloaded successfully', 'success');
     } catch (error: any) {
       console.error('Error downloading bill:', error);
-      alert('Failed to download bill: ' + (error.message || error));
+      showToast('Download Failed', 'Failed to download bill: ' + (error.message || error), 'error');
     } finally {
       setDownloadingId(null);
     }
@@ -198,6 +215,13 @@ export default function MonthlyFeesPage() {
 
   return (
     <div className="space-y-6">
+      <Toast 
+        isOpen={toast.isOpen}
+        onClose={() => setToast(prev => ({ ...prev, isOpen: false }))}
+        title={toast.title}
+        message={toast.message}
+        type={toast.type}
+      />
       {/* Header */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">

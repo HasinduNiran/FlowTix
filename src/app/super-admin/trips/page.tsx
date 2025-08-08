@@ -8,6 +8,7 @@ import { BusService } from '@/services/bus.service';
 import { DataTable } from '@/components/dashboard/DataTable';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Toast } from '@/components/ui/Toast';
 
 export default function TripsPage() {
   const router = useRouter();
@@ -19,6 +20,12 @@ export default function TripsPage() {
   const [dateFilter, setDateFilter] = useState<string>(new Date().toISOString().split('T')[0]);
   const [routes, setRoutes] = useState<any[]>([]);
   const [buses, setBuses] = useState<any[]>([]);
+  const [toast, setToast] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info' as 'success' | 'error' | 'warning' | 'info'
+  });
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -111,14 +118,55 @@ export default function TripsPage() {
     }
   };
 
+  // Toast helper function
+  const showToast = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    setToast({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
+  // Confirmation state for delete actions
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    id: string;
+  }>({
+    isOpen: false,
+    id: ''
+  });
+
+  // Show confirmation toast for delete
+  const confirmDelete = (tripId: string) => {
+    setDeleteConfirmation({
+      isOpen: true,
+      id: tripId
+    });
+    
+    // Show confirmation toast
+    setToast({
+      isOpen: true,
+      title: 'Confirm Delete',
+      message: 'Are you sure you want to delete this trip? Click here to confirm.',
+      type: 'warning'
+    });
+  };
+
   const handleDeleteTrip = async (tripId: string) => {
-    if (window.confirm('Are you sure you want to delete this trip?')) {
+    if (deleteConfirmation.isOpen && deleteConfirmation.id === tripId) {
       try {
         await TripService.deleteTrip(tripId);
+        showToast('Success', 'Trip deleted successfully!', 'success');
         fetchTrips(); // Refresh the list
       } catch (err: any) {
-        alert(err.message || 'Failed to delete trip');
+        showToast('Error', err.message || 'Failed to delete trip', 'error');
+      } finally {
+        setDeleteConfirmation({ isOpen: false, id: '' }); // Reset confirmation
       }
+    } else {
+      // Show delete confirmation
+      confirmDelete(tripId);
     }
   };
 
@@ -284,8 +332,8 @@ export default function TripsPage() {
         <div className="flex space-x-2 justify-center">
           <button
             onClick={() => handleDeleteTrip(id)}
-            className="p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors"
-            title="Delete Trip"
+            className={`p-2 ${deleteConfirmation.id === id ? 'bg-red-500 text-white' : 'bg-red-50 text-red-600'} rounded-full hover:bg-red-100 transition-colors`}
+            title={deleteConfirmation.id === id ? "Click again to confirm delete" : "Delete Trip"}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -513,6 +561,32 @@ export default function TripsPage() {
           )}
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toast.isOpen && (
+        <div onClick={() => {
+          // For warning toasts, clicking should confirm the delete action
+          if (toast.type === 'warning' && deleteConfirmation.isOpen) {
+            handleDeleteTrip(deleteConfirmation.id);
+          }
+        }}>
+          <Toast
+            isOpen={toast.isOpen}
+            onClose={() => {
+              setToast(prev => ({ ...prev, isOpen: false }));
+              // Also reset delete confirmation when toast is closed
+              if (deleteConfirmation.isOpen) {
+                setDeleteConfirmation({ isOpen: false, id: '' });
+              }
+            }}
+            title={toast.title}
+            message={toast.message}
+            type={toast.type}
+            duration={toast.type === 'warning' ? 10000 : 5000} // Longer duration for confirmations
+            showCloseButton={true}
+          />
+        </div>
+      )}
     </div>
   );
 }

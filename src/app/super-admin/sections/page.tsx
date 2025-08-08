@@ -6,6 +6,7 @@ import { SectionService, Section, SectionCategory } from '@/services/section.ser
 import { DataTable } from '@/components/dashboard/DataTable';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Toast } from '@/components/ui/Toast';
 
 export default function SectionsPage() {
   const router = useRouter();
@@ -14,6 +15,12 @@ export default function SectionsPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [toast, setToast] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info' as 'success' | 'error' | 'warning' | 'info'
+  });
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
@@ -71,9 +78,20 @@ export default function SectionsPage() {
     }
   };
 
+  // Toast helper function
+  const showToast = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    setToast({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
   const handleAddSection = async () => {
     try {
       await SectionService.createSection(newSection);
+      showToast('Success', 'Section created successfully!', 'success');
       setShowAddModal(false);
       setNewSection({
         sectionNumber: 0,
@@ -85,19 +103,45 @@ export default function SectionsPage() {
       fetchSections(currentPage);
     } catch (err) {
       console.error('Failed to add section:', err);
-      setError('Failed to add section. Please try again.');
+      showToast('Error', 'Failed to add section. Please try again.', 'error');
     }
   };
 
+  // Confirmation state for delete actions
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    id: string;
+  }>({
+    isOpen: false,
+    id: ''
+  });
+
+  // Show confirmation toast for delete
+  const confirmDelete = (id: string) => {
+    setDeleteConfirmation({
+      isOpen: true,
+      id
+    });
+    
+    // Show confirmation toast
+    showToast('Confirm Delete', 'Are you sure you want to delete this section? Click here to confirm.', 'warning');
+  };
+
   const handleDeleteSection = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this section?')) {
+    if (deleteConfirmation.isOpen && deleteConfirmation.id === id) {
       try {
         await SectionService.deleteSection(id);
+        showToast('Success', 'Section deleted successfully!', 'success');
         fetchSections(currentPage);
+        setDeleteConfirmation({ isOpen: false, id: '' }); // Reset confirmation
       } catch (err) {
         console.error('Failed to delete section:', err);
-        setError('Failed to delete section. Please try again.');
+        showToast('Error', 'Failed to delete section. Please try again.', 'error');
+        setDeleteConfirmation({ isOpen: false, id: '' }); // Reset confirmation
       }
+    } else {
+      // Show delete confirmation
+      confirmDelete(id);
     }
   };
 
@@ -192,8 +236,8 @@ export default function SectionsPage() {
           </button>
           <button
             onClick={() => handleDeleteSection(value)}
-            className="p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors"
-            title="Delete Section"
+            className={`p-2 ${deleteConfirmation.id === value ? 'bg-red-500 text-white' : 'bg-red-50 text-red-600'} rounded-full hover:bg-red-100 transition-colors`}
+            title={deleteConfirmation.id === value ? "Click again to confirm delete" : "Delete Section"}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -638,6 +682,32 @@ export default function SectionsPage() {
               </Button>
             </div>
           </div>
+        </div>
+      )}
+      
+      {/* Toast Notification */}
+      {toast.isOpen && (
+        <div onClick={() => {
+          // For warning toasts, clicking should confirm the delete action
+          if (toast.type === 'warning' && deleteConfirmation.isOpen) {
+            handleDeleteSection(deleteConfirmation.id);
+          }
+        }}>
+          <Toast
+            isOpen={toast.isOpen}
+            onClose={() => {
+              setToast(prev => ({ ...prev, isOpen: false }));
+              // Also reset delete confirmation when toast is closed
+              if (deleteConfirmation.isOpen) {
+                setDeleteConfirmation({ isOpen: false, id: '' });
+              }
+            }}
+            title={toast.title}
+            message={toast.message}
+            type={toast.type}
+            duration={toast.type === 'warning' ? 10000 : 5000} // Longer duration for confirmations
+            showCloseButton={true}
+          />
         </div>
       )}
     </div>

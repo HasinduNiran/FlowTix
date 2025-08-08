@@ -57,12 +57,13 @@ export default function TransactionDetailPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete this transaction?')) {
-      return;
-    }
+  const confirmDelete = () => {
+    setShowConfirmModal(true);
+  };
 
+  const handleDelete = async () => {
     try {
+      setIsDeleting(true);
       await ExpenseTransactionService.deleteExpenseTransaction(id);
       showToast('Transaction deleted successfully!', 'success');
       router.push('/super-admin/expenses?tab=transactions');
@@ -70,6 +71,9 @@ export default function TransactionDetailPage() {
       setError('Failed to delete transaction. Please try again.');
       showToast('Failed to delete transaction. Please try again.', 'error');
       console.error('Error deleting transaction:', err);
+    } finally {
+      setIsDeleting(false);
+      setShowConfirmModal(false);
     }
   };
 
@@ -244,7 +248,7 @@ export default function TransactionDetailPage() {
                   Edit Transaction
                 </Button>
                 <Button
-                  onClick={handleDelete}
+                  onClick={confirmDelete}
                   className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 shadow-lg hover:shadow-xl transition-all duration-200"
                 >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -394,6 +398,21 @@ export default function TransactionDetailPage() {
           title={toastConfig.title}
           message={toastConfig.message}
           onClose={hideToast}
+        />
+      )}
+      
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <ConfirmationModal 
+          isOpen={showConfirmModal}
+          title="Delete Transaction"
+          message="Are you sure you want to delete this transaction? This action cannot be undone."
+          confirmText={isDeleting ? "Deleting..." : "Delete"}
+          cancelText="Cancel"
+          isLoading={isDeleting}
+          onConfirm={handleDelete}
+          onClose={() => setShowConfirmModal(false)}
+          type="danger"
         />
       )}
     </div>

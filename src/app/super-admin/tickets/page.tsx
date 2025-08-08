@@ -10,6 +10,7 @@ import { TripService } from '@/services/trip.service';
 import { DataTable } from '@/components/dashboard/DataTable';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Toast } from '@/components/ui/Toast';
 
 export default function TicketsPage() {
   const router = useRouter();
@@ -41,6 +42,21 @@ export default function TicketsPage() {
   const [dateFilter, setDateFilter] = useState<string>(new Date().toISOString().split('T')[0]); // Default to today
   const [tripNumberFilter, setTripNumberFilter] = useState<string>('latest');
   const [availableTrips, setAvailableTrips] = useState<number[]>([]);
+  const [toast, setToast] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info' as 'success' | 'error' | 'warning' | 'info'
+  });
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    id: string | null;
+    ticketNumber: string | null;
+  }>({
+    isOpen: false,
+    id: null,
+    ticketNumber: null
+  });
 
   // Fetch initial data on component mount
   useEffect(() => {
@@ -367,19 +383,42 @@ export default function TicketsPage() {
     }
   };
 
+  const showToast = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => {
+    setToast({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
+  const confirmDelete = (ticketId: string) => {
+    const ticket = tickets.find(ticket => ticket._id === ticketId);
+    setDeleteConfirmation({
+      isOpen: true,
+      id: ticketId,
+      ticketNumber: `#${ticket?._id?.substring(0, 8)}` || 'this ticket'
+    });
+  };
+
   const handleDeleteTicket = async (ticketId: string) => {
-    if (window.confirm('Are you sure you want to delete this ticket?')) {
-      try {
-        await TicketService.deleteTicket(ticketId);
-        // Refresh the current page
-        if (searchTerm) {
-          fetchTicketsWithSearch();
-        } else {
-          fetchTicketsWithPagination();
-        }
-      } catch (err: any) {
-        alert(err.message || 'Failed to delete ticket');
+    try {
+      await TicketService.deleteTicket(ticketId);
+      // Refresh the current page
+      if (searchTerm) {
+        fetchTicketsWithSearch();
+      } else {
+        fetchTicketsWithPagination();
       }
+      showToast('Success', 'Ticket has been deleted successfully', 'success');
+    } catch (err: any) {
+      showToast('Error', err.message || 'Failed to delete ticket', 'error');
+    } finally {
+      setDeleteConfirmation({
+        isOpen: false,
+        id: null,
+        ticketNumber: null
+      });
     }
   };
 
@@ -678,7 +717,7 @@ export default function TicketsPage() {
             </svg>
           </button>
           <button
-            onClick={() => handleDeleteTicket(id)}
+            onClick={() => confirmDelete(id)}
             className="p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors"
             title="Delete Ticket"
           >
@@ -1158,6 +1197,51 @@ export default function TicketsPage() {
           )}
         </div>
       </div>
+      
+      {/* Toast Notification */}
+      <Toast 
+        isOpen={toast.isOpen}
+        onClose={() => setToast(prev => ({ ...prev, isOpen: false }))}
+        title={toast.title}
+        message={toast.message}
+        type={toast.type}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmation.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 transform transition-all duration-300 ease-out scale-100">
+            <div className="flex items-center mb-4">
+              <div className="bg-red-100 p-2 rounded-full">
+                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h3 className="ml-3 text-lg font-semibold text-gray-900">Confirm Delete</h3>
+            </div>
+            
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete ticket <span className="font-semibold">{deleteConfirmation.ticketNumber}</span>? This action cannot be undone.
+            </p>
+            
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setDeleteConfirmation({ isOpen: false, id: null, ticketNumber: null })}
+                className="px-4 py-2 border-gray-300 text-gray-700"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => deleteConfirmation.id && handleDeleteTicket(deleteConfirmation.id)}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white"
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

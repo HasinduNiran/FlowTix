@@ -6,12 +6,24 @@ import { StopService, Stop } from '@/services/stop.service';
 import { RouteService, Route } from '@/services/route.service';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
+import { Toast } from '@/components/ui/Toast';
 
 export default function StopDetailPage() {
   const [stop, setStop] = useState<Stop | null>(null);
   const [route, setRoute] = useState<Route | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info' as 'success' | 'error' | 'warning' | 'info'
+  });
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+  }>({
+    isOpen: false
+  });
   const router = useRouter();
   const params = useParams();
   const stopId = params.id as string;
@@ -51,17 +63,34 @@ export default function StopDetailPage() {
     router.push(`/super-admin/stops/${stop?._id}/edit`);
   };
 
+  const showToast = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info') => {
+    setToast({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
+  const confirmDeleteStop = () => {
+    setDeleteConfirmation({
+      isOpen: true
+    });
+  };
+
   const handleDeleteStop = async () => {
     if (!stop) return;
     
-    if (window.confirm('Are you sure you want to delete this stop?')) {
-      try {
-        await StopService.deleteStop(stop._id);
+    try {
+      await StopService.deleteStop(stop._id);
+      showToast('Success', 'Stop deleted successfully', 'success');
+      // Set a small delay before redirecting to show the toast
+      setTimeout(() => {
         router.push('/super-admin/stops');
-      } catch (err) {
-        setError('Failed to delete stop. Please try again.');
-        console.error(err);
-      }
+      }, 1500);
+    } catch (err: any) {
+      showToast('Error', err.message || 'Failed to delete stop. Please try again.', 'error');
+      setDeleteConfirmation({ isOpen: false });
     }
   };
 
@@ -143,6 +172,50 @@ export default function StopDetailPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+      <Toast 
+        isOpen={toast.isOpen}
+        onClose={() => setToast(prev => ({ ...prev, isOpen: false }))}
+        title={toast.title}
+        message={toast.message}
+        type={toast.type}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmation.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 transform transition-all duration-300 ease-out scale-100">
+            <div className="flex items-center mb-4">
+              <div className="bg-red-100 p-2 rounded-full">
+                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h3 className="ml-3 text-lg font-semibold text-gray-900">Confirm Delete</h3>
+            </div>
+            
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete <span className="font-semibold">{stop?.stopName}</span>? This action cannot be undone.
+            </p>
+            
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setDeleteConfirmation({ isOpen: false })}
+                className="px-4 py-2 border-gray-300 text-gray-700"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDeleteStop}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white"
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="max-w-6xl mx-auto">
         {/* Header Section */}
         <div className="mb-8">
@@ -195,7 +268,7 @@ export default function StopDetailPage() {
                   Edit Stop
                 </Button>
                 <Button 
-                  onClick={handleDeleteStop} 
+                  onClick={confirmDeleteStop} 
                   className="group bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5"
                 >
                   <svg className="w-4 h-4 mr-2 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
