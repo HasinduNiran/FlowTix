@@ -16,7 +16,7 @@ export const AuthService = {
       const { accessToken, user } = response.data.data;
       
       // Store authentication data
-      Cookies.set(AUTH_TOKEN_KEY, accessToken, { expires: 7 }); // 7 days
+      Cookies.set(AUTH_TOKEN_KEY, accessToken, { expires: 1 }); // 1 day
       localStorage.setItem(USER_KEY, JSON.stringify(user));
       
       // Map backend user role to frontend user role
@@ -47,7 +47,7 @@ export const AuthService = {
       const { accessToken, user } = response.data.data;
       
       // Store authentication data
-      Cookies.set(AUTH_TOKEN_KEY, accessToken, { expires: 7 }); // 7 days
+      Cookies.set(AUTH_TOKEN_KEY, accessToken, { expires: 1 }); // 1 day
       localStorage.setItem(USER_KEY, JSON.stringify(user));
       
       // Map backend user role to frontend user role
@@ -80,12 +80,16 @@ export const AuthService = {
   
   async refreshToken(): Promise<string> {
     try {
+      // The refreshToken is sent in HTTP-only cookie automatically
       const response = await api.post('/auth/refresh-token');
       const { accessToken } = response.data.data;
       
+      // Store the new access token
       Cookies.set(AUTH_TOKEN_KEY, accessToken, { expires: 7 });
       return accessToken;
     } catch (error) {
+      console.error('Error refreshing token:', error);
+      // Clean up on failed refresh
       this.logout();
       throw new Error('Session expired. Please login again.');
     }

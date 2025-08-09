@@ -212,6 +212,15 @@ export const TicketService = {
       if (filters?.tripNumber) {
         params.tripNumber = filters.tripNumber;
       }
+      
+      // Add from and to stop filters to the API query parameters
+      if (filters?.fromStopId) {
+        params.fromStopId = filters.fromStopId;
+      }
+      
+      if (filters?.toStopId) {
+        params.toStopId = filters.toStopId;
+      }
 
       let allTickets: Ticket[] = [];
       let totalTickets = 0;
@@ -266,21 +275,8 @@ export const TicketService = {
             }
             
             const isOwnerTicket = ticketBusId && busIds.includes(ticketBusId);
-            
-            // Additional client-side filtering for stops
-            let passesFromStopFilter = true;
-            let passesToStopFilter = true;
-            
-            if (filters?.fromStopId && ticket.fromStop) {
-              passesFromStopFilter = ticket.fromStop.stopId === filters.fromStopId;
-            }
-            
-            if (filters?.toStopId && ticket.toStop) {
-              passesToStopFilter = ticket.toStop.stopId === filters.toStopId;
-            }
-            
-            console.log(`Ticket ${ticket._id} bus ${ticketBusId} is owner ticket:`, isOwnerTicket, 'passes filters:', passesFromStopFilter && passesToStopFilter);
-            return isOwnerTicket && passesFromStopFilter && passesToStopFilter;
+            console.log(`Ticket ${ticket._id} bus ${ticketBusId} is owner ticket:`, isOwnerTicket);
+            return isOwnerTicket;
           });
           
           console.log('Filtered tickets:', allTickets.length, 'out of', allTicketsData.length);
