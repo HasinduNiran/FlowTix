@@ -602,7 +602,11 @@ function AddUserModal({ onClose, onSuccess, buses }: { onClose: () => void; onSu
                 <input
                   type="text"
                   value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const formattedValue = value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+                    setFormData({ ...formData, username: formattedValue });
+                  }}
                   className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   placeholder="Enter username"
                   required
@@ -857,7 +861,11 @@ function EditUserModal({ user, onClose, onSuccess, buses }: { user: User; onClos
                 <input
                   type="text"
                   value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const formattedValue = value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+                    setFormData({ ...formData, username: formattedValue });
+                  }}
                   className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   placeholder="Enter username"
                   required

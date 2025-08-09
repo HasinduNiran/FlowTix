@@ -208,7 +208,14 @@ const UserModal: React.FC<UserModalProps> = ({
   };
 
   const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    let processedValue = value;
+    
+    // Format username: first letter capitalized, rest lowercase
+    if (field === 'username' && typeof value === 'string') {
+      processedValue = value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+    }
+    
+    setFormData(prev => ({ ...prev, [field]: processedValue }));
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
