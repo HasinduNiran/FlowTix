@@ -280,7 +280,7 @@ export default function RouteSectionsPage() {
                               Route
                             </th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Stop
+                              Stop & Section #
                             </th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Category
@@ -314,7 +314,10 @@ export default function RouteSectionsPage() {
                                   <div className="text-sm font-medium text-gray-900">
                                     {section.stopId.stopName}
                                   </div>
-                                  <div className="text-sm text-gray-500">
+                                  <div className="text-sm text-gray-500 flex items-center">
+                                    <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full mr-2">
+                                      Section #{section.stopId.sectionNumber || "N/A"}
+                                    </span>
                                     Code: {section.stopId.stopCode}
                                   </div>
                                 </div>
@@ -371,9 +374,14 @@ export default function RouteSectionsPage() {
                                     <h3 className="text-lg font-semibold text-gray-900 truncate">
                                       {section.stopId.stopName}
                                     </h3>
-                                    <p className="text-sm text-gray-500">
-                                      Code: {section.stopId.stopCode}
-                                    </p>
+                                    <div className="flex items-center">
+                                      <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full mr-2">
+                                        Section #{section.stopId.sectionNumber || "N/A"}
+                                      </span>
+                                      <span className="text-sm text-gray-500">
+                                        Code: {section.stopId.stopCode}
+                                      </span>
+                                    </div>
                                   </div>
                                 </div>
                                 <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full flex-shrink-0 ${
@@ -431,9 +439,14 @@ export default function RouteSectionsPage() {
                                   <h3 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
                                     {section.stopId.stopName}
                                   </h3>
-                                  <p className="text-sm text-gray-500">
-                                    Code: {section.stopId.stopCode}
-                                  </p>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full">
+                                      Section #{section.stopId.sectionNumber || "N/A"}
+                                    </span>
+                                    <span className="text-sm text-gray-500">
+                                      Code: {section.stopId.stopCode}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                               <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full flex-shrink-0 ${
