@@ -31,13 +31,54 @@ export default function UsersPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalUsers, setTotalUsers] = useState<number>(0);
+  const [usersByRole, setUsersByRole] = useState<Record<string, number>>({});
+  const itemsPerPage = 15;
 
   useEffect(() => {
     if (currentUser) {
-      fetchUsers();
+      fetchUsers(1);
       fetchBuses();
     }
   }, [currentUser]);
+
+  // Fetch users when page changes
+  useEffect(() => {
+    if (currentUser && currentPage >= 1) {
+      fetchUsers(currentPage);
+    }
+  }, [currentPage]);
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    if (currentUser) {
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+      } else {
+        fetchUsers(1);
+      }
+    }
+  }, [filter]);
+
+  // Handle search term changes with debouncing
+  useEffect(() => {
+    if (currentUser) {
+      const timeoutId = setTimeout(() => {
+        if (currentPage !== 1) {
+          setCurrentPage(1);
+        } else {
+          fetchUsers(1);
+        }
+      }, 500); // 500ms debounce
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [searchTerm]);
 
   // Refetch buses when editing user changes (to include/exclude their assigned buses)
   useEffect(() => {
@@ -81,7 +122,7 @@ export default function UsersPage() {
     }
   };
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (page: number = 1) => {
     if (!currentUser) {
       console.log('No current user found');
       return;
@@ -91,11 +132,21 @@ export default function UsersPage() {
       setLoading(true);
       setError(null);
       
-      // Get users specific to the current owner (backend will filter automatically)
-      const backendUsers = await UserService.getUsersByOwner();
+      const filters = {
+        role: filter === 'all' ? '' : filter,
+        search: searchTerm
+      };
+      
+      const [result, countsData] = await Promise.all([
+        UserService.getUsersWithPagination(page, itemsPerPage, filters),
+        UserService.getAllUsersCount()
+      ]);
+      
+      console.log('Pagination result:', result);
+      console.log('Counts data:', countsData);
       
       // Filter to only show managers and conductors (not admins or owners)
-      const filteredUsers = backendUsers
+      const filteredUsers = result.users
         .filter(user => user.role === 'manager' || user.role === 'conductor')
         .map(user => ({
           _id: user._id,
@@ -110,6 +161,10 @@ export default function UsersPage() {
         }));
       
       setUsers(filteredUsers);
+      setCurrentPage(result.currentPage);
+      setTotalPages(Math.max(1, Math.ceil(result.totalCount / itemsPerPage)));
+      setTotalUsers(countsData.totalUsers);
+      setUsersByRole(countsData.usersByRole);
       
       // If no users found and no buses available, show helpful message
       if (filteredUsers.length === 0 && buses.length === 0) {
@@ -126,7 +181,7 @@ export default function UsersPage() {
   const handleToggleStatus = async (userId: string, currentStatus: boolean) => {
     try {
       await UserService.toggleUserStatus(userId, !currentStatus);
-      await fetchUsers(); // Refresh the list
+      await fetchUsers(currentPage); // Refresh the current page
     } catch (error) {
       console.error('Error toggling user status:', error);
       setError('Failed to update user status. Please try again.');
@@ -140,16 +195,29 @@ export default function UsersPage() {
     
     try {
       await UserService.deleteUser(userId);
-      await fetchUsers(); // Refresh the list
+      await fetchUsers(currentPage); // Refresh the current page
     } catch (error) {
       console.error('Error deleting user:', error);
       setError('Failed to delete user. Please try again.');
     }
   };
 
-  const filteredUsers = users.filter(user => 
-    filter === 'all' || user.role === filter
-  );
+  // Pagination handlers
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
 
   const getRoleBadge = (role: User['role']) => {
     switch (role) {
@@ -163,7 +231,7 @@ export default function UsersPage() {
   };
 
   const getUserCountByRole = (role: string) => {
-    return users.filter(user => user.role === role).length;
+    return usersByRole[role] || 0;
   };
 
   const getRoleIcon = (role: string) => {
@@ -301,7 +369,33 @@ export default function UsersPage() {
               </button>
             </div>
 
-            {filteredUsers.length === 0 ? (
+            {/* Search Bar */}
+            <div className="mb-6">
+              <div className="relative max-w-md">
+                <input
+                  type="text"
+                  placeholder="Search staff members by username..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                />
+                <svg
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              </div>
+            </div>
+
+            {users.length === 0 ? (
               <div className="flex flex-col justify-center items-center h-80 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
                 <div className="text-6xl mb-4">👥</div>
                 <h3 className="text-xl font-semibold text-gray-700 mb-2">No Staff Members Found</h3>
@@ -345,7 +439,7 @@ export default function UsersPage() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredUsers.map((user) => (
+                      {users.map((user) => (
                         <tr key={user._id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
@@ -467,6 +561,76 @@ export default function UsersPage() {
                 </div>
               </div>
             )}
+
+            {/* Pagination */}
+            {(totalPages > 1 || users.length > 0) && (
+              <div className="flex items-center justify-between mt-6 px-4 py-3 bg-white border border-gray-200 rounded-lg">
+                <div className="flex items-center text-sm text-gray-700">
+                  <span>
+                    Showing page {currentPage} of {totalPages} ({itemsPerPage} items per page) - Total: {totalUsers} users
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={handlePreviousPage}
+                    disabled={currentPage === 1}
+                    className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      currentPage === 1
+                        ? 'text-gray-400 cursor-not-allowed'
+                        : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Previous
+                  </button>
+                  
+                  <div className="flex space-x-1">
+                    {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                      const page = i + 1;
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => handlePageChange(page)}
+                          className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                            currentPage === page
+                              ? 'bg-blue-600 text-white'
+                              : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      );
+                    })}
+                    {totalPages > 5 && (
+                      <>
+                        <span className="px-2 py-2 text-gray-500">...</span>
+                        <button
+                          onClick={() => handlePageChange(totalPages)}
+                          className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                            currentPage === totalPages
+                              ? 'bg-blue-600 text-white'
+                              : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {totalPages}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  
+                  <button
+                    onClick={handleNextPage}
+                    disabled={currentPage === totalPages}
+                    className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      currentPage === totalPages
+                        ? 'text-gray-400 cursor-not-allowed'
+                        : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -477,7 +641,7 @@ export default function UsersPage() {
           onClose={() => setShowAddModal(false)}
           onSuccess={() => {
             setShowAddModal(false);
-            fetchUsers();
+            fetchUsers(currentPage);
           }}
           buses={buses}
         />
@@ -490,7 +654,7 @@ export default function UsersPage() {
           onClose={() => setEditingUser(null)}
           onSuccess={() => {
             setEditingUser(null);
-            fetchUsers();
+            fetchUsers(currentPage);
           }}
           buses={buses}
         />
@@ -515,6 +679,12 @@ function AddUserModal({ onClose, onSuccess, buses }: { onClose: () => void; onSu
     e.preventDefault();
     if (!formData.username.trim() || !formData.password.trim()) {
       setError('Username and password are required');
+      return;
+    }
+
+    // Validate password length
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters long');
       return;
     }
 
@@ -616,14 +786,18 @@ function AddUserModal({ onClose, onSuccess, buses }: { onClose: () => void; onSu
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Password <span className="text-red-500">*</span>
+                  <span className="text-xs font-normal text-gray-500 block mt-1">
+                    Minimum 8 characters required
+                  </span>
                 </label>
                 <input
                   type="password"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  placeholder="Enter password"
+                  placeholder="Enter password (min 8 characters)"
                   required
+                  minLength={8}
                 />
               </div>
             </div>
