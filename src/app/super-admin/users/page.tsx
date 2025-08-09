@@ -67,11 +67,29 @@ export default function UsersPage() {
     }
   }, [filterRole]);
 
+  // Handle search term changes with debouncing
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+      } else {
+        fetchUsers(1);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
   const fetchUsers = async (page: number = 1) => {
     try {
       setLoading(true);
+      const filters = {
+        role: filterRole,
+        search: searchTerm
+      };
+      
       const [result, countsData] = await Promise.all([
-        UserService.getUsersWithPagination(page, itemsPerPage),
+        UserService.getUsersWithPagination(page, itemsPerPage, filters),
         UserService.getAllUsersCount()
       ]);
       
@@ -194,16 +212,6 @@ export default function UsersPage() {
     showToast('Info', 'Refreshing users...', 'info');
   };
 
-  // Filter users based on search term and role
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = searchTerm === '' || 
-      user.username.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesRole = filterRole === '' || user.role === filterRole;
-    
-    return matchesSearch && matchesRole;
-  });
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
       <div className="container mx-auto p-6 max-w-7xl">
@@ -313,7 +321,7 @@ export default function UsersPage() {
               </div>
               
               <div className="mt-4 text-sm text-gray-600">
-                Showing {filteredUsers.length} of {users.length} users on this page
+                Showing {users.length} of {totalUsers} users
                 {totalPages > 1 && <span> • Page {currentPage} of {totalPages}</span>}
                 {searchTerm && <span> • Filtered by: "{searchTerm}"</span>}
                 {filterRole && <span> • Role: {filterRole}</span>}
@@ -329,7 +337,7 @@ export default function UsersPage() {
                   </svg>
                 </div>
                 <p className="text-blue-800 font-medium text-lg">
-                  Showing {filteredUsers.length} of {totalUsers} users (Page {currentPage} of {totalPages})
+                  Showing {users.length} of {totalUsers} users (Page {currentPage} of {totalPages})
                 </p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -361,9 +369,9 @@ export default function UsersPage() {
             </div>
 
             {/* Users Table */}
-            {filteredUsers.length > 0 ? (
+            {users.length > 0 ? (
               <UserTable
-                users={filteredUsers}
+                users={users}
                 loading={loading}
                 onEdit={openEditModal}
                 onToggleStatus={handleToggleUserStatus}

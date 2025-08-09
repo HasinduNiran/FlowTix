@@ -37,9 +37,22 @@ export const UserService = {
   },
 
   // Get users with pagination
-  async getUsersWithPagination(page: number = 1, limit: number = 15): Promise<{users: BackendUser[], count: number, totalPages: number, currentPage: number, totalCount: number}> {
+  async getUsersWithPagination(page: number = 1, limit: number = 15, filters?: {role?: string, search?: string}): Promise<{users: BackendUser[], count: number, totalPages: number, currentPage: number, totalCount: number}> {
     try {
-      const response = await api.get(`/auth/users?page=${page}&limit=${limit}`);
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString()
+      });
+      
+      if (filters?.role && filters.role !== '') {
+        params.append('role', filters.role);
+      }
+      
+      if (filters?.search && filters.search !== '') {
+        params.append('search', filters.search);
+      }
+      
+      const response = await api.get(`/auth/users?${params.toString()}`);
       return {
         users: response.data.data,
         count: response.data.count || response.data.data.length,
