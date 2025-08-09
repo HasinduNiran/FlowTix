@@ -50,6 +50,7 @@ const UserModal: React.FC<UserModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [busesLoading, setBusesLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [busSearchTerm, setBusSearchTerm] = useState('');
 
   const fetchAvailableBuses = async () => {
     try {
@@ -306,8 +307,25 @@ const UserModal: React.FC<UserModalProps> = ({
                 </div>
               ) : (
                 <>
+                  {/* Bus Search Bar */}
+                  <div className="mb-3">
+                    <Input
+                      type="text"
+                      placeholder="Search buses by bus number..."
+                      value={busSearchTerm}
+                      onChange={(e) => setBusSearchTerm(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-40 overflow-y-auto p-1 border border-gray-200 rounded-lg">
-                    {buses.filter(bus => bus.isActive).map((bus) => {
+                    {buses
+                      .filter(bus => bus.isActive)
+                      .filter(bus => 
+                        bus.busNumber.toLowerCase().includes(busSearchTerm.toLowerCase()) ||
+                        bus.busName.toLowerCase().includes(busSearchTerm.toLowerCase())
+                      )
+                      .map((bus) => {
                       const isAssigned = formData.assignedBuses.includes(bus._id);
                       console.log(`Bus ${bus.busNumber} (${bus._id}): ${isAssigned ? 'CHECKED' : 'unchecked'}`);
                       
@@ -334,11 +352,28 @@ const UserModal: React.FC<UserModalProps> = ({
                       );
                     })}
                   </div>
-                  {buses.filter(bus => bus.isActive).length === 0 && (
-                    <p className="text-gray-500 text-sm italic p-4 text-center border border-gray-200 rounded-lg">
-                      No available buses for assignment. All buses are currently assigned to other managers.
-                    </p>
-                  )}
+                  {(() => {
+                    const activeBuses = buses.filter(bus => bus.isActive);
+                    const filteredBuses = activeBuses.filter(bus => 
+                      bus.busNumber.toLowerCase().includes(busSearchTerm.toLowerCase()) ||
+                      bus.busName.toLowerCase().includes(busSearchTerm.toLowerCase())
+                    );
+                    
+                    if (activeBuses.length === 0) {
+                      return (
+                        <p className="text-gray-500 text-sm italic p-4 text-center border border-gray-200 rounded-lg">
+                          No available buses for assignment. All buses are currently assigned to other managers.
+                        </p>
+                      );
+                    } else if (filteredBuses.length === 0 && busSearchTerm) {
+                      return (
+                        <p className="text-gray-500 text-sm italic p-4 text-center border border-gray-200 rounded-lg">
+                          No buses found matching "{busSearchTerm}". Try a different search term.
+                        </p>
+                      );
+                    }
+                    return null;
+                  })()}
                 </>
               )}
               

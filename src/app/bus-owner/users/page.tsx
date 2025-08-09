@@ -509,6 +509,7 @@ function AddUserModal({ onClose, onSuccess, buses }: { onClose: () => void; onSu
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [busSearchTerm, setBusSearchTerm] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -763,6 +764,7 @@ function EditUserModal({ user, onClose, onSuccess, buses }: { user: User; onClos
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [busSearchTerm, setBusSearchTerm] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
