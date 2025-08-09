@@ -1,7 +1,8 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { User, UserRole, LoginCredentials, SignupCredentials } from '@/types/auth';
 import { AuthService } from '@/services/auth.service';
+import Cookies from 'js-cookie';
 
 type AuthContextType = {
   user: User | null;
@@ -11,6 +12,7 @@ type AuthContextType = {
   logout: () => void;
   forgotPassword: (email: string) => Promise<void>;
   isAuthenticated: boolean;
+  refreshToken: () => Promise<string | null>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,14 +22,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  // Function to refresh the token
+  const refreshToken = useCallback(async (): Promise<string | null> => {
+    try {
+      return await AuthService.refreshToken();
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
     // Check if user is logged in
     const currentUser = AuthService.getCurrentUser();
     if (currentUser) {
       setUser(currentUser);
+      
+      // If the user is logged in, schedule a token refresh check
+      const token = Cookies.get('auth-token');
+      if (token) {
+        // Try to refresh the token if it's close to expiration
+        // We'll assume tokens last for 15 minutes and refresh after 10 minutes
+        setTimeout(() => {
+          refreshToken();
+        }, 10 * 60 * 1000); // 10 minutes
+      }
     }
     setLoading(false);
-  }, []);
+  }, [refreshToken]);
 
   const login = async (username: string, password: string) => {
     setLoading(true);
@@ -35,6 +57,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const credentials: LoginCredentials = { email: username, password };
       const { user } = await AuthService.login(credentials);
       setUser(user);
+      
+      // Schedule token refresh
+      setTimeout(() => {
+        refreshToken();
+      }, 10 * 60 * 1000); // 10 minutes
       
       // Redirect based on role
       if (user.role === 'super-admin') {
@@ -95,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signup, 
         logout, 
         forgotPassword, 
+        refreshToken,
         isAuthenticated: AuthService.isAuthenticated() 
       }}
     >

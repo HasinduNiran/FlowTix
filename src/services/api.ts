@@ -24,6 +24,15 @@ api.interceptors.request.use(
   }
 );
 
+// Flag to prevent multiple refresh token requests
+let isRefreshing = false;
+// Queue of requests to be retried after token refresh
+interface QueueItem {
+  resolve: (token: string) => void;
+  reject: (error: any) => void;
+}
+let failedRequestsQueue: QueueItem[] = [];
+
 // Add response interceptor to handle errors
 api.interceptors.response.use(
   (response) => {
@@ -31,15 +40,39 @@ api.interceptors.response.use(
   },
   async (error) => {
     const originalRequest = error.config;
+    if (!originalRequest) return Promise.reject(error);
     
-    // Handle 401 Unauthorized errors
+    // Add content type if it's missing
+    if (!originalRequest.headers['Content-Type']) {
+      originalRequest.headers['Content-Type'] = 'application/json';
+    }
+    
+    // Handle 401 Unauthorized errors (token expired)
     if (error.response && error.response.status === 401 && !originalRequest._retry) {
+      // Mark this request as a retry to prevent infinite loops
       originalRequest._retry = true;
+      
+      // If we're already refreshing the token, queue this request
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedRequestsQueue.push({
+            resolve: (token) => {
+              originalRequest.headers['Authorization'] = `Bearer ${token}`;
+              resolve(api(originalRequest));
+            },
+            reject: (err) => {
+              reject(err);
+            },
+          });
+        });
+      }
+      
+      isRefreshing = true;
       
       try {
         // Try to refresh the token
-        const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh-token`, {}, {
-          withCredentials: true
+        const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}/auth/refresh-token`, {}, {
+          withCredentials: true // Important for cookies
         });
         
         const { accessToken } = response.data.data;
@@ -47,20 +80,39 @@ api.interceptors.response.use(
         // Update the token
         Cookies.set('auth-token', accessToken, { expires: 7 });
         
+        // Process queued requests with the new token
+        failedRequestsQueue.forEach(request => {
+          request.resolve(accessToken);
+        });
+        
+        // Clear the queue
+        failedRequestsQueue = [];
+        
         // Update the header and retry the original request
         originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
-        return axios(originalRequest);
+        return api(originalRequest);
       } catch (refreshError) {
-        // If refresh token fails, logout
+        // If refresh token fails, reject all queued requests
+        failedRequestsQueue.forEach(request => {
+          request.reject(refreshError);
+        });
+        
+        // Clear the queue
+        failedRequestsQueue = [];
+        
+        // Logout user
         Cookies.remove('auth-token');
         localStorage.removeItem('user');
         
         // Redirect to login page if not already there
         if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-          window.location.href = '/login';
+          window.location.href = '/login?session=expired';
         }
         
         return Promise.reject(refreshError);
+      } finally {
+        // Reset the refreshing flag
+        isRefreshing = false;
       }
     }
     
