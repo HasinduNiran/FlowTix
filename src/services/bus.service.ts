@@ -38,11 +38,65 @@ export interface Bus {
 export const BusService = {
   async getAllBuses(): Promise<Bus[]> {
     try {
-      const response = await api.get('/buses');
+      const response = await api.get('/buses?limit=9999');
       return response.data.data;
     } catch (error) {
       console.error('Error fetching buses:', error);
       throw error;
+    }
+  },
+
+  async getBusesWithPagination(page: number = 1, limit: number = 15, filters?: {category?: string, search?: string}): Promise<{buses: Bus[], count: number, totalPages: number, currentPage: number, totalCount: number}> {
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString()
+      });
+      
+      if (filters?.category && filters.category !== 'all') {
+        params.append('category', filters.category);
+      }
+      
+      if (filters?.search && filters.search !== '') {
+        params.append('search', filters.search);
+      }
+      
+      const response = await api.get(`/buses?${params.toString()}`);
+      return {
+        buses: response.data.data,
+        count: response.data.count || response.data.data.length,
+        totalPages: response.data.totalPages || Math.ceil((response.data.totalCount || response.data.data.length) / limit),
+        currentPage: response.data.currentPage || page,
+        totalCount: response.data.totalCount || response.data.data.length
+      };
+    } catch (error) {
+      console.error('Error fetching buses with pagination:', error);
+      throw error;
+    }
+  },
+
+  async getAllBusesCount(): Promise<{totalBuses: number, busesByCategory: Record<string, number>}> {
+    try {
+      const response = await api.get('/buses/counts');
+      return response.data.data;
+    } catch (error) {
+      console.error('Error fetching bus counts:', error);
+      // Fallback: if counts endpoint doesn't exist, fetch all buses and count manually
+      try {
+        const allBuses = await this.getAllBuses();
+        const busesByCategory = allBuses.reduce((acc, bus) => {
+          acc[bus.category] = (acc[bus.category] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        
+        return {
+          totalBuses: allBuses.length,
+          busesByCategory
+        };
+      } catch (fallbackError) {
+        console.error('Error in fallback bus count:', fallbackError);
+        throw error;
+      }
     }
   },
   

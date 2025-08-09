@@ -21,6 +21,15 @@ export default function BusesPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalBuses, setTotalBuses] = useState<number>(0);
+  const [busesByCategory, setBusesByCategory] = useState<Record<string, number>>({});
+  const itemsPerPage = 15;
+  
   const router = useRouter();
   const { user } = useAuth();
 
@@ -34,14 +43,60 @@ export default function BusesPage() {
   ];
 
   useEffect(() => {
-    fetchBuses();
+    fetchBuses(1);
   }, []);
 
-  const fetchBuses = async () => {
+  // Fetch buses when page changes
+  useEffect(() => {
+    if (currentPage >= 1) {
+      fetchBuses(currentPage);
+    }
+  }, [currentPage]);
+
+  // Reset to page 1 when category filter changes
+  useEffect(() => {
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+    } else {
+      fetchBuses(1);
+    }
+  }, [activeCategory]);
+
+  // Handle search term changes with debouncing
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+      } else {
+        fetchBuses(1);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
+  const fetchBuses = async (page: number = 1) => {
     try {
       setLoading(true);
-      const data = await BusService.getAllBuses();
-      setBuses(data);
+      const filters = {
+        category: activeCategory,
+        search: searchTerm
+      };
+      
+      const [result, countsData] = await Promise.all([
+        BusService.getBusesWithPagination(page, itemsPerPage, filters),
+        BusService.getAllBusesCount()
+      ]);
+      
+      console.log('Pagination result:', result);
+      console.log('Counts data:', countsData);
+      console.log('Total pages calculated:', result.totalPages);
+      
+      setBuses(result.buses);
+      setCurrentPage(result.currentPage);
+      setTotalPages(result.totalPages);
+      setTotalBuses(countsData.totalBuses);
+      setBusesByCategory(countsData.busesByCategory);
       setError(null);
     } catch (err) {
       setError('Failed to fetch buses. Please try again later.');
@@ -51,14 +106,27 @@ export default function BusesPage() {
     }
   };
 
-  // Filter buses based on selected category
-  const filteredBuses = activeCategory === 'all' 
-    ? buses 
-    : buses.filter(bus => bus.category === activeCategory);
+  // Pagination handlers
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  // Remove client-side filtering since we're doing it on the backend
   const getCategoryCount = (category: string) => {
-    if (category === 'all') return buses.length;
-    return buses.filter(bus => bus.category === category).length;
+    if (category === 'all') return totalBuses;
+    return busesByCategory[category] || 0;
   };
 
   const handleViewDetails = (bus: Bus) => {
@@ -281,6 +349,30 @@ export default function BusesPage() {
         </div>
       )}
 
+      {/* Search Section */}
+      <div className="mb-6 p-6 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="relative flex-grow max-w-md">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <input
+            type="text"
+            placeholder="Search buses by bus number, name..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-12 pr-4 py-3 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
+          />
+        </div>
+        
+        <div className="mt-4 text-sm text-gray-600">
+          Showing {buses.length} of {totalBuses} buses
+          {searchTerm && <span> • Filtered by: "{searchTerm}"</span>}
+          {activeCategory !== 'all' && <span> • Category: {busCategories.find(c => c.key === activeCategory)?.label}</span>}
+        </div>
+      </div>
+
       {/* Category Tabs */}
       <div className="mb-6">
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-2">
@@ -364,7 +456,7 @@ export default function BusesPage() {
           <div className="flex items-center space-x-2">
             <span className="flex items-center">
               <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
-              Showing {filteredBuses.length} of {buses.length} buses
+              Showing {buses.length} of {totalBuses} buses (Page {currentPage} of {totalPages})
             </span>
             {activeCategory !== 'all' && (
               <span className="text-gray-400">
@@ -398,11 +490,11 @@ export default function BusesPage() {
             <div className="px-6 py-4 border-b border-gray-200">
               <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
                 <h3 className="text-lg font-semibold text-gray-900">
-                  Bus Fleet ({filteredBuses.length})
+                  Bus Fleet ({buses.length})
                 </h3>
                 
                 {/* Enhanced View Toggle Buttons */}
-                {filteredBuses.length > 0 && (
+                {buses.length > 0 && (
                   <div className="relative">
                     <div className="flex bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-1.5 shadow-sm">
                       <button
@@ -441,7 +533,7 @@ export default function BusesPage() {
           {viewMode === 'table' ? (
             <div className="bg-white shadow-lg rounded-2xl overflow-hidden border border-gray-200">
               <DataTable 
-                data={filteredBuses} 
+                data={buses} 
                 columns={columns} 
                 keyExtractor={(item) => item._id}
                 emptyMessage={
@@ -453,8 +545,8 @@ export default function BusesPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredBuses.length > 0 ? (
-                filteredBuses.map((bus) => (
+              {buses.length > 0 ? (
+                buses.map((bus: Bus) => (
                   <BusCard key={bus._id} bus={bus} />
                 ))
               ) : (
@@ -471,6 +563,76 @@ export default function BusesPage() {
                   <p className="text-sm mt-2">Start by adding a new bus to the system</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {(totalPages > 1 || buses.length > 0) && (
+            <div className="flex items-center justify-between mt-6 px-4 py-3 bg-white border border-gray-200 rounded-lg">
+              <div className="flex items-center text-sm text-gray-700">
+                <span>
+                  Showing page {currentPage} of {totalPages} ({itemsPerPage} items per page) - Total: {totalBuses} buses
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={handlePreviousPage}
+                  disabled={currentPage === 1}
+                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    currentPage === 1
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  Previous
+                </button>
+                
+                <div className="flex space-x-1">
+                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                    const page = i + 1;
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => handlePageChange(page)}
+                        className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                          currentPage === page
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  })}
+                  {totalPages > 5 && (
+                    <>
+                      <span className="px-2 py-2 text-gray-500">...</span>
+                      <button
+                        onClick={() => handlePageChange(totalPages)}
+                        className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                          currentPage === totalPages
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {totalPages}
+                      </button>
+                    </>
+                  )}
+                </div>
+                
+                <button
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages}
+                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    currentPage === totalPages
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  Next
+                </button>
+              </div>
             </div>
           )}
         </>
