@@ -36,6 +36,49 @@ export const UserService = {
     }
   },
 
+  // Get users with pagination
+  async getUsersWithPagination(page: number = 1, limit: number = 15): Promise<{users: BackendUser[], count: number, totalPages: number, currentPage: number, totalCount: number}> {
+    try {
+      const response = await api.get(`/auth/users?page=${page}&limit=${limit}`);
+      return {
+        users: response.data.data,
+        count: response.data.count || response.data.data.length,
+        totalPages: response.data.totalPages || Math.ceil((response.data.totalCount || response.data.data.length) / limit),
+        currentPage: response.data.currentPage || page,
+        totalCount: response.data.totalCount || response.data.data.length
+      };
+    } catch (error) {
+      console.error('Error fetching users with pagination:', error);
+      throw error;
+    }
+  },
+
+  // Get user counts by different criteria
+  async getAllUsersCount(): Promise<{totalUsers: number, usersByRole: Record<string, number>}> {
+    try {
+      const response = await api.get('/auth/users/counts');
+      return response.data.data;
+    } catch (error) {
+      console.error('Error fetching user counts:', error);
+      // Fallback: if counts endpoint doesn't exist, fetch all users and count manually
+      try {
+        const allUsers = await this.getAllUsers();
+        const usersByRole = allUsers.reduce((acc, user) => {
+          acc[user.role] = (acc[user.role] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        
+        return {
+          totalUsers: allUsers.length,
+          usersByRole
+        };
+      } catch (fallbackError) {
+        console.error('Error in fallback user count:', fallbackError);
+        throw error;
+      }
+    }
+  },
+
   // Get users by owner (managers and conductors created by or assigned to the owner)
   async getUsersByOwner(): Promise<BackendUser[]> {
     try {

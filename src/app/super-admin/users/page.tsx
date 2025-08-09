@@ -18,6 +18,13 @@ export default function UsersPage() {
   const [selectedUser, setSelectedUser] = useState<BackendUser | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalUsers, setTotalUsers] = useState<number>(0);
+  const [usersByRole, setUsersByRole] = useState<Record<string, number>>({});
+  const itemsPerPage = 15;
+  
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('');
@@ -39,11 +46,40 @@ export default function UsersPage() {
     setToast({ show: true, title, message, type });
   };
 
-  const fetchUsers = async () => {
+  // Fetch users on component mount
+  useEffect(() => {
+    fetchUsers(1);
+  }, []);
+
+  // Fetch users when page changes
+  useEffect(() => {
+    if (currentPage >= 1) {
+      fetchUsers(currentPage);
+    }
+  }, [currentPage]);
+
+  // Reset to page 1 when role filter changes
+  useEffect(() => {
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+    } else {
+      fetchUsers(1);
+    }
+  }, [filterRole]);
+
+  const fetchUsers = async (page: number = 1) => {
     try {
       setLoading(true);
-      const fetchedUsers = await UserService.getAllUsers();
-      setUsers(fetchedUsers);
+      const [result, countsData] = await Promise.all([
+        UserService.getUsersWithPagination(page, itemsPerPage),
+        UserService.getAllUsersCount()
+      ]);
+      
+      setUsers(result.users);
+      setCurrentPage(result.currentPage);
+      setTotalPages(result.totalPages);
+      setTotalUsers(countsData.totalUsers);
+      setUsersByRole(countsData.usersByRole);
     } catch (error: any) {
       console.error('Error fetching users:', error);
       showToast('Error', 'Failed to fetch users. Please try again.', 'error');
@@ -52,16 +88,30 @@ export default function UsersPage() {
     }
   };
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+  // Pagination handlers
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
 
   const handleCreateUser = async (userData: CreateUserRequest) => {
     try {
       setActionLoading(true);
       const newUser = await UserService.createUser(userData);
-      setUsers(prev => [...prev, newUser]);
       showToast('Success', 'User created successfully', 'success');
+      closeModals();
+      fetchUsers(currentPage); // Refresh current page
     } catch (error: any) {
       console.error('Error creating user:', error);
       const errorMessage = error.response?.data?.message || 'Failed to create user';
@@ -78,10 +128,9 @@ export default function UsersPage() {
     try {
       setActionLoading(true);
       const updatedUser = await UserService.updateUser(selectedUser._id, userData);
-      setUsers(prev => 
-        prev.map(user => user._id === selectedUser._id ? updatedUser : user)
-      );
       showToast('Success', 'User updated successfully', 'success');
+      closeModals();
+      fetchUsers(currentPage); // Refresh current page
     } catch (error: any) {
       console.error('Error updating user:', error);
       const errorMessage = error.response?.data?.message || 'Failed to update user';
@@ -96,10 +145,8 @@ export default function UsersPage() {
     try {
       const newStatus = !user.isActive;
       const updatedUser = await UserService.toggleUserStatus(user._id, newStatus);
-      setUsers(prev => 
-        prev.map(u => u._id === user._id ? updatedUser : u)
-      );
       showToast('Success', `User ${newStatus ? 'activated' : 'deactivated'} successfully`, 'success');
+      fetchUsers(currentPage); // Refresh current page
     } catch (error: any) {
       console.error('Error toggling user status:', error);
       const errorMessage = error.response?.data?.message || 'Failed to update user status';
@@ -113,10 +160,9 @@ export default function UsersPage() {
     try {
       setActionLoading(true);
       await UserService.deleteUser(selectedUser._id);
-      setUsers(prev => prev.filter(user => user._id !== selectedUser._id));
-      setShowDeleteModal(false);
-      setSelectedUser(null);
+      closeModals();
       showToast('Success', 'User deleted successfully', 'success');
+      fetchUsers(currentPage); // Refresh current page
     } catch (error: any) {
       console.error('Error deleting user:', error);
       const errorMessage = error.response?.data?.message || 'Failed to delete user';
@@ -144,7 +190,7 @@ export default function UsersPage() {
   };
 
   const handleRefresh = () => {
-    fetchUsers();
+    fetchUsers(currentPage);
     showToast('Info', 'Refreshing users...', 'info');
   };
 
@@ -267,7 +313,8 @@ export default function UsersPage() {
               </div>
               
               <div className="mt-4 text-sm text-gray-600">
-                Showing {filteredUsers.length} of {users.length} users
+                Showing {filteredUsers.length} of {users.length} users on this page
+                {totalPages > 1 && <span> • Page {currentPage} of {totalPages}</span>}
                 {searchTerm && <span> • Filtered by: "{searchTerm}"</span>}
                 {filterRole && <span> • Role: {filterRole}</span>}
               </div>
@@ -275,30 +322,40 @@ export default function UsersPage() {
 
             {/* Stats Cards */}
             <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-blue-100 rounded-full">
+                  <svg className="h-5 w-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <p className="text-blue-800 font-medium text-lg">
+                  Showing {filteredUsers.length} of {totalUsers} users (Page {currentPage} of {totalPages})
+                </p>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-600">
                     {users.filter(u => u.isActive).length}
                   </div>
-                  <div className="text-sm text-blue-700 font-medium">Active Users</div>
+                  <div className="text-sm text-blue-700 font-medium">Active (Current Page)</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-purple-600">
-                    {users.filter(u => u.role === 'admin').length}
+                    {usersByRole.admin || 0}
                   </div>
-                  <div className="text-sm text-purple-700 font-medium">Admins</div>
+                  <div className="text-sm text-purple-700 font-medium">Total Admins</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-green-600">
-                    {users.filter(u => u.role === 'owner').length}
+                    {usersByRole.owner || 0}
                   </div>
-                  <div className="text-sm text-green-700 font-medium">Bus Owners</div>
+                  <div className="text-sm text-green-700 font-medium">Total Bus Owners</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-orange-600">
-                    {users.filter(u => u.role === 'conductor').length}
+                    {usersByRole.conductor || 0}
                   </div>
-                  <div className="text-sm text-orange-700 font-medium">Conductors</div>
+                  <div className="text-sm text-orange-700 font-medium">Total Conductors</div>
                 </div>
               </div>
             </div>
@@ -343,6 +400,76 @@ export default function UsersPage() {
                 </div>
               </div>
             ) : null}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-6 px-4 py-3 bg-white border border-gray-200 rounded-lg">
+                <div className="flex items-center text-sm text-gray-700">
+                  <span>
+                    Showing page {currentPage} of {totalPages} ({itemsPerPage} items per page)
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={handlePreviousPage}
+                    disabled={currentPage === 1}
+                    className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      currentPage === 1
+                        ? 'text-gray-400 cursor-not-allowed'
+                        : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Previous
+                  </button>
+                  
+                  <div className="flex space-x-1">
+                    {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                      const page = i + 1;
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => handlePageChange(page)}
+                          className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                            currentPage === page
+                              ? 'bg-blue-600 text-white'
+                              : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      );
+                    })}
+                    {totalPages > 5 && (
+                      <>
+                        <span className="px-2 py-2 text-gray-500">...</span>
+                        <button
+                          onClick={() => handlePageChange(totalPages)}
+                          className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                            currentPage === totalPages
+                              ? 'bg-blue-600 text-white'
+                              : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {totalPages}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  
+                  <button
+                    onClick={handleNextPage}
+                    disabled={currentPage === totalPages}
+                    className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      currentPage === totalPages
+                        ? 'text-gray-400 cursor-not-allowed'
+                        : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Create User Modal */}
             {showCreateModal && (
